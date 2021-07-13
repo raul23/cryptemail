@@ -2,6 +2,11 @@
 mac-monitoring
 ==============
 
+.. contents:: **Contents**
+   :depth: 3
+   :local:
+   :backlinks: top
+
 Install package
 ===============
 To install ``monitoring`` package:
