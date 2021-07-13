@@ -86,7 +86,7 @@ setup(name='mac-monitoring',
       cmdclass={'build_py': build_py},
       include_package_data=True,
       entry_points={
-        'console_scripts': ['monitor=monitoring.monitor:main']
+        'console_scripts': ['monitor=monitoring.scripts.monitor:main']
       },
       project_urls={  # Optional
           'Bug Reports': 'https://github.com/raul23/mac-monitoring/issues',
