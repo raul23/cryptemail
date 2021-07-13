@@ -2,6 +2,20 @@
 mac-monitoring
 ==============
 
+.. raw:: html
+
+  <p align="center">
+    <br> 🚧 &nbsp;&nbsp;&nbsp;<b>Work-In-Progress</b>
+  </p>
+  
+The main objective is to build a monitoring program for Mac that will
+check for anomalies in your system (e.g. failed login attempts and potential
+keyloggers or spyware installed) and alert you for any suspicious activities 
+within your system. It will be able to save the reports locally and/or send 
+them through encrypted emails to one of your email accounts.
+
+You will be able to control the program remotely through ``ssh``.
+
 `:warning:`
 
   **Disclaimer**
