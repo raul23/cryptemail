@@ -15,10 +15,9 @@ logging_formatter = 'only_msg'
 # ===============
 # 2. Edit options
 # ===============
-edit = False
+edit = None
 app = None
-reset = False
-cfg = 'main'
+reset = None
 
 # ==================
 # 3. Monitor options
