@@ -6,7 +6,15 @@ import sys
 from setuptools import find_packages, setup
 from setuptools.command.build_py import build_py as build_py_orig
 
+import monitoring
 from monitoring import __version__, __test_version__
+
+major, minor = 3, 7
+if sys.version_info < (major, minor):
+    raise RuntimeError(f"""
+    {monitoring.__name__} v{__version__}+ supports Python {major}.{minor}
+    and above.
+    """)
 
 excluded = []
 
@@ -73,6 +81,7 @@ setup(name='mac-monitoring',
       url='https://github.com/raul23/mac-monitoring',
       author='R',
       license='GPLv3',
+      python_requires=f'>={major}.{minor}',
       packages=find_packages(exclude=['tests']),
       cmdclass={'build_py': build_py},
       include_package_data=True,
