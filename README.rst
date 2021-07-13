@@ -14,8 +14,6 @@ keyloggers or spyware installed) and alert you for any suspicious activities
 within your system. It will be able to save the reports locally and/or send 
 them through encrypted emails to one of your email accounts.
 
-You will be able to control the program remotely through ``ssh``.
-
 `:warning:`
 
   **Disclaimer**
