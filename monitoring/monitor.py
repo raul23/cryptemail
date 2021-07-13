@@ -1,4 +1,3 @@
-import argparse
 import os
 
 from monitoring import __version__
