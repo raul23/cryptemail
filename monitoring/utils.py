@@ -95,6 +95,14 @@ def color_msg(msg, color='y', bold=False):
     return f"{_COLOR_TO_CODE[color]}{msg}{COLORS['NC']}"
 
 
+def get_important_msg():
+    return f'''
+{COLORS['RED']}IMPORTANT:{COLORS['NC']} this code is for educational and informational purposes only. The
+author, raul23, assumes no responsibility for the use of this code or any information 
+contained therein. The user is solely responsible for any action he/she takes with this 
+code and information contained in it.'''
+
+
 def get_usage(script_filename):
     return f"{COLORS['BLUE']}{script_filename.split('.py')[0]} " \
            f"[OPTIONS]{COLORS['NC']}"
