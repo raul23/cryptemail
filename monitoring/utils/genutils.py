@@ -466,8 +466,8 @@ def color(msg, msg_color='y', bold=False):
     return f"{_COLOR_TO_CODE[msg_color]}{msg}{COLORS['NC']}"
 
 
-def error():
-    return f"{color('ERROR', 'r')}"
+def error(msg):
+    return f'ERROR {red(msg)}'
 
 
 def default(default_value):
@@ -488,16 +488,16 @@ def usage(script_filename):
     return f"{color(msg, 'b')}"
 
 
+def warning():
+    return f"{color('WARNING', 'y')}"
+
+
 def green(msg):
     return f"{color(msg, 'g')}"
 
 
 def red(msg):
     return f"{color(msg, 'r')}"
-
-
-def warning():
-    return f"{color('WARNING', 'y')}"
 
 
 def yellow(msg):
