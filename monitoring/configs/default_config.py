@@ -19,9 +19,9 @@ edit = None
 app = None
 reset = None
 
-# ==================
-# 3. Monitor options
-# ==================
+# =====================
+# 3. Monitoring options
+# =====================
 abort_monitoring = False
 pause_monitoring = False
 start_monitoring = False
