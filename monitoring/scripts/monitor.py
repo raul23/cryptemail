@@ -52,7 +52,7 @@ class Service:
         logger.debug(f"Starting {self.service_type} '{self.service_name}'...")
         script_path = os.path.join(os.path.dirname(scripts.__file__), SERVICE_SCRIPT)
         if not os.path.exists(script_path):
-            raise FileNotFoundError(f'The service script is not foud: {script_path}')
+            raise FileNotFoundError(f'The service script is not found: {script_path}')
         plist_content = f'''<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC -//Apple Computer//DTD PLIST 1.0//EN http://www.apple.com/DTDs/PropertyList-1.0.dtd >
 <plist version="1.0">
