@@ -22,4 +22,8 @@ reset = None
 # ==================
 # 3. Monitor options
 # ==================
+abort_monitoring = False
+pause_monitoring = False
 start_monitoring = False
+force = False
+stealth = False
