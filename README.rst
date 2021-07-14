@@ -59,7 +59,7 @@ To uninstall ``monitoring`` package:
 
    .. code-block:: console
    
-      $ pip uninstall pyebooktools
+      $ pip uninstall mac-monitoring
       Found existing installation: mac-monitoring 0.1.0a1
       Uninstalling mac-monitoring-0.1.0a1:
         Would remove:
