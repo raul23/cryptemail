@@ -12,7 +12,7 @@ The main objective is to build a monitoring program for Mac that will check for
 anomalies in your system (e.g. failed login attempts and potential keyloggers
 or spyware installed) and alert you of any suspicious activities within your
 system. It will be able to save the reports locally and/or send them through
-encrypted emails to one of your email accounts.
+encrypted emails to a specified email account.
 
 `:warning:`
 
