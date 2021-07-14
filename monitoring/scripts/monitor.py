@@ -54,18 +54,18 @@ class Service:
         if not os.path.exists(script_path):
             raise FileNotFoundError(f'The service script is not foud: {script_path}')
         plist_content = f'''<?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC -//Apple Computer//DTD PLIST 1.0//EN http://www.apple.com/DTDs/PropertyList-1.0.dtd >
-        <plist version="1.0">
-          <dict>
-            <key>Label</key>
-            <string>{self.service_name}</string>
-            <key>Program</key>
-            <string>{script_path}</string>
-            <key>KeepAlive</key>
-            <true/>
-          </dict>
-        </plist>
-            '''
+<!DOCTYPE plist PUBLIC -//Apple Computer//DTD PLIST 1.0//EN http://www.apple.com/DTDs/PropertyList-1.0.dtd >
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>{self.service_name}</string>
+    <key>Program</key>
+    <string>{script_path}</string>
+    <key>KeepAlive</key>
+    <true/>
+  </dict>
+</plist>
+'''
         tmp_file_plist = tempfile.mkstemp(suffix='.plist')[1]
         with open(tmp_file_plist, 'w') as f:
             f.write(plist_content)
