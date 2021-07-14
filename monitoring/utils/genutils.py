@@ -53,7 +53,7 @@ class ArgumentParser(argparse.ArgumentParser):
         # self.print_help(sys.stderr)
         # self.print_usage(sys.stderr)
         print(self.format_usage().splitlines()[0])
-        self.exit(2, color_msg(f'\nerror: {message}\n', 'r'))
+        self.exit(2, color(f'\nerror: {message}\n', 'r'))
 
 
 # Ref.: https://stackoverflow.com/a/32891625/14664104
@@ -111,16 +111,6 @@ class MyFormatter(argparse.RawDescriptionHelpFormatter):
             return ', '.join(parts)
 
 
-def color_msg(msg, color='y', bold=False):
-    color = color.lower()
-    colors = list(_COLOR_TO_CODE.keys())
-    assert color in colors, f'Wrong color: {color}. Only these colors are ' \
-                            f'supported: {colors}'
-    if bold:
-        msg = f"{COLORS['BOLD']}{msg}{COLORS['NC']}"
-    return f"{_COLOR_TO_CODE[color]}{msg}{COLORS['NC']}"
-
-
 def copy(src, dst, clobber=True):
     dst = Path(dst)
     if dst.exists():
@@ -135,10 +125,6 @@ def copy(src, dst, clobber=True):
         shutil.copy(src, dst)
 
 
-def error():
-    return f"{COLORS['RED']}ERROR{COLORS['NC']}"
-
-
 def get_config_dict(cfg_type='main', configs_dirpath=None):
     return load_cfg_dict(get_config_filepath(cfg_type, configs_dirpath), cfg_type)
 
@@ -151,18 +137,6 @@ def get_config_filepath(cfg_type='main', configs_dirpath=None):
     else:
         raise ValueError(f"Invalid cfg_type: {cfg_type}")
     return cfg_filepath
-
-
-def get_default_message(default_value):
-    return f" ({COLORS['GREEN']}default: {default_value}{COLORS['NC']})"
-
-
-def get_important_msg():
-    return f'''
-{COLORS['RED']}IMPORTANT:{COLORS['NC']} this code is for educational and informational purposes only. The
-author, raul23, assumes no responsibility for the use of this code or any information 
-contained therein. The user is solely responsible for any action he/she takes with this 
-code and information contained in it.'''
 
 
 def get_settings(conf, cfg_type):
@@ -182,11 +156,6 @@ def get_settings(conf, cfg_type):
         return _settings
     else:
         raise ValueError(f"Invalid cfg_type: {cfg_type}")
-
-
-def get_usage(script_filename):
-    return f"{COLORS['BLUE']}{script_filename.split('.py')[0]} " \
-           f"[OPTIONS]{COLORS['NC']}"
 
 
 def load_cfg_dict(cfg_filepath, cfg_type):
@@ -484,8 +453,55 @@ def setup_log(package=None, configs_dirpath=None, quiet=False, verbose=False,
     logger.debug(main_log_msg)
 
 
+# ------
+# Colors
+# ------
+def color(msg, msg_color='y', bold=False):
+    msg_color = msg_color.lower()
+    colors = list(_COLOR_TO_CODE.keys())
+    assert msg_color in colors, f'Wrong color: {msg_color}. Only these colors are ' \
+                                f'supported: {msg_color}'
+    if bold:
+        msg = f"{COLORS['BOLD']}{msg}{COLORS['NC']}"
+    return f"{_COLOR_TO_CODE[msg_color]}{msg}{COLORS['NC']}"
+
+
+def error():
+    return f"{color('ERROR', 'r')}"
+
+
+def default(default_value):
+    msg = f"default: {default_value}"
+    return f" ({color(msg, 'g')})"
+
+
+def important():
+    return f'''
+{color("IMPORTANT:", "r")} this code is for educational and informational purposes only. The
+author, raul23, assumes no responsibility for the use of this code or any information 
+contained therein. The user is solely responsible for any action he/she takes with this 
+code and information contained in it.'''
+
+
+def usage(script_filename):
+    msg = f"{script_filename.split('.py')[0]} [OPTIONS]"
+    return f"{color(msg, 'b')}"
+
+
+def green(msg):
+    return f"{color(msg, 'g')}"
+
+
+def red(msg):
+    return f"{color(msg, 'r')}"
+
+
 def warning():
-    return f"{COLORS['YELLOW']}WARNING{COLORS['NC']}"
+    return f"{color('WARNING', 'y')}"
+
+
+def yellow(msg):
+    return f"{color(msg)}"
 
 
 # -------------------------------
