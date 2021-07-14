@@ -68,7 +68,7 @@ logging = {
         # -----------------------------
         # Loggers using console handler
         # -----------------------------
-        "monitoring.edit_config":
+        "monitoring.edit":
         {
           "level": "DEBUG",
           "handlers": ["console"],
