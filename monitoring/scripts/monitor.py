@@ -1,20 +1,16 @@
-import argparse
-import os
+import tempfile
 
 from monitoring import __name__ as PACKAGE_NAME, __version__ as VERSION
 from monitoring.configs import __path__, default_config as default_cfg
 from monitoring.edit_config import edit_file, reset_file
-from monitoring.utils.genutils import (COLORS, ArgumentParser, MyFormatter,
-                                       get_config_dict, get_configs_dirpath,
-                                       get_default_message, get_important_msg,
-                                       get_usage, override_config_with_args,
-                                       process_returned_values, setup_log)
+from monitoring import scripts
+from monitoring.utils.genutils import *
 from monitoring.utils.logutils import init_log
-
 
 logger = init_log(__name__, __file__)
 LOG_CFG = 'log'
 MAIN_CFG = 'main'
+AGENT_SCRIPT = 'agent.py'
 
 # =====================
 # Default config values
@@ -23,6 +19,72 @@ EDIT = default_cfg.edit
 LOGGING_FORMATTER = default_cfg.logging_formatter
 LOGGING_LEVEL = default_cfg.logging_level
 RESET = default_cfg.reset
+
+
+class Agent:
+    def __init__(self, stealth=False):
+        self.stealth = stealth
+        if stealth:
+            logger.info('Stealth mode enabled')
+            self.agent_name = 'com.mac.load.agent'
+        else:
+            self.agent_name = 'com.mac-monitoring.agent'
+
+    def load(self):
+        pass
+
+    def unload(self):
+        pass
+
+
+def check_result(result, error_msg, valid_msg, err_key=None, skip_key=None):
+    stderr = result.stderr.decode().strip()
+    if skip_key and stderr and stderr.find(skip_key):
+        logger.warning(f'{warning()} {stderr}')
+    elif result.returncode or (err_key and stderr.find(err_key) != -1):
+        logger.error(f"{error()} {error_msg}: {stderr}")
+        return 1
+    else:
+        logger.info(valid_msg)
+        return 0
+
+
+def get_plist_path(agent_name):
+    return os.path.expanduser(f'~/Library/LaunchAgents/{agent_name}.plist')
+
+
+def load_agent(main_cfg):
+    agent_name = main_cfg.agent_name
+    logger.debug(f"Loading agent '{agent_name}'...")
+    plist_path = get_plist_path(agent_name)
+    script_path = os.path.join(os.path.dirname(scripts.__file__), AGENT_SCRIPT)
+    plist_content = f'''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC -//Apple Computer//DTD PLIST 1.0//EN http://www.apple.com/DTDs/PropertyList-1.0.dtd >
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>{agent_name}</string>
+    <key>Program</key>
+    <string>{script_path}</string>
+    <key>KeepAlive</key>
+    <true/>
+  </dict>
+</plist>
+    '''
+    """
+    with open(plist_path, 'w') as f:
+        f.write(plist_config)
+    """
+    tmp_file_plist = tempfile.mkstemp(suffix='.plist')[1]
+    with open(tmp_file_plist, 'w') as f:
+        f.write(plist_content)
+    copy(tmp_file_plist, plist_path)
+    remove_file(tmp_file_plist)
+    cmd = f'launchctl load {plist_path}'
+    # subprocess.run(shlex.split(cmd), shell=False)
+    # os.system(cmd)
+    result = subprocess.run(shlex.split(cmd), capture_output=True)
+    return check_result(result, "The agent couldn't be loaded", 'Agent loaded', skip_key='already loaded')
 
 
 def setup_argparser():
@@ -81,7 +143,7 @@ Script for monitoring your Mac.
              f'(`{MAIN_CFG}`) or the logging configuration file (`{LOG_CFG}`).'
              + get_default_message(EDIT))
     edit_group.add_argument(
-        "-a", "--app", dest="app", default=None,
+        "--app", dest="app", default=None,
         help='''Name of the application to use for editing the file. If no 
             name is given, then the default application for opening this type of
             file will be used.''')
@@ -96,9 +158,32 @@ Script for monitoring your Mac.
     monitor_group = parser.add_argument_group(
         f"{COLORS['YELLOW']}Monitoring options{COLORS['NC']}")
     monitor_group.add_argument(
+        '-a', '--abort-monitoring', action="store_true",
+        help='Abort system monitoring.')
+    monitor_group.add_argument(
+        '-p', '--pause-monitoring', action="store_true",
+        help='Pause system monitoring.')
+    monitor_group.add_argument(
         '-s', '--start-monitoring', action="store_true",
         help='Start system monitoring.')
+    monitor_group.add_argument(
+        '-f', '--force', action="store_true",
+        help='Forcibly execute the given operation (e.g. pause) on all '
+             'loaded monitoring agents no matter their type (stealth or not).')
+    monitor_group.add_argument(
+        '--stealth', action="store_true",
+        help='Enable stealth system monitoring, i.e. make the monitoring as '
+             'transparent as possible.')
     return parser
+
+
+def unload_agent(main_cfg):
+    logger.debug(f"Unloading agent '{main_cfg.agent_name}'...")
+    plist_path = get_plist_path(main_cfg.agent_name)
+    cmd = f'launchctl unload {plist_path}'
+    result = subprocess.run(shlex.split(cmd), capture_output=True)
+    return check_result(result, "The agent couldn't be unloaded",
+                        'Agent unloaded', 'not find')
 
 
 def main():
@@ -124,12 +209,19 @@ def main():
                   logging_level=main_cfg.logging_level,
                   logging_formatter=main_cfg.logging_formatter)
         process_returned_values(returned_values)
+        if main_cfg.stealth:
+            logger.info('Stealth mode enabled')
+            main_cfg.agent_name = 'com.mac.load.agent'
+        else:
+            main_cfg.agent_name = 'com.mac-monitoring.agent'
         if main_cfg.edit:
             exit_code = edit_file(main_cfg.edit, main_cfg.app, get_configs_dirpath())
         elif main_cfg.reset:
             exit_code = reset_file(main_cfg.reset, get_configs_dirpath())
-        elif args.start_monitoring:
-            pass
+        elif main_cfg.start_monitoring:
+            exit_code = load_agent(main_cfg)
+        elif main_cfg.pause_monitoring:
+            exit_code = unload_agent(main_cfg)
     except AssertionError as e:
         # TODO (IMPORTANT): use same logic as in other project
         # TODO: add KeyboardInterruptError
