@@ -45,4 +45,4 @@ To uninstall ``monitoring`` package:
 
 .. code-block:: bash
 
-   pip uninstall mac-monitoring
+   pip uninstall -y mac-monitoring
