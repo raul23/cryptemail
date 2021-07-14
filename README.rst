@@ -8,21 +8,21 @@ mac-monitoring
     <br> 🚧 &nbsp;&nbsp;&nbsp;<b>Work-In-Progress</b>
   </p>
   
-The main objective is to build a monitoring program for Mac that will
-check for anomalies in your system (e.g. failed login attempts and potential
-keyloggers or spyware installed) and alert you of any suspicious activities 
-within your system. It will be able to save the reports locally and/or send 
-them through encrypted emails to one of your email accounts.
+The main objective is to build a monitoring program for Mac that will check for
+anomalies in your system (e.g. failed login attempts and potential keyloggers
+or spyware installed) and alert you of any suspicious activities within your
+system. It will be able to save the reports locally and/or send them through
+encrypted emails to one of your email accounts.
 
 `:warning:`
 
   **Disclaimer**
 
-  This repository is for educational and informational purposes 
-  only. The author, raul23, assumes no responsibility for the use 
-  of this repository, code or any information contained therein. 
-  The user is solely responsible for any action he/she takes with 
-  this repository, code and information contained in it.
+  This repository is for educational and informational purposes only. The
+  author, raul23, assumes no responsibility for the use of this repository,
+  code or any information contained therein. The user is solely responsible for
+  any action he/she takes with this repository, code and information contained
+  in it.
 
   Do not abuse this material. Be responsible.
 
