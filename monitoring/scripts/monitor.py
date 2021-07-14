@@ -2,7 +2,7 @@ import tempfile
 
 from monitoring import __name__ as PACKAGE_NAME, __version__ as VERSION
 from monitoring.configs import __path__, default_config as default_cfg
-from monitoring.edit_config import edit_file, reset_file
+from monitoring.edit import edit_file, reset_file
 from monitoring import scripts
 from monitoring.utils.genutils import *
 from monitoring.utils.logutils import init_log
@@ -10,7 +10,7 @@ from monitoring.utils.logutils import init_log
 logger = init_log(__name__, __file__)
 LOG_CFG = 'log'
 MAIN_CFG = 'main'
-AGENT_SCRIPT = 'agent.py'
+SERVICE_SCRIPT = 'service.py'
 
 # =====================
 # Default config values
@@ -23,39 +23,42 @@ RESET = default_cfg.reset
 
 
 class Service:
-    def __init__(self, service_type='agent'):
+    def __init__(self, service_type='agent', logging_formatter='simple'):
         self.service_type = service_type
         if service_type == 'agent':
-            self.agent_name = 'com.mac-monitoring.agent'
+            self.service_name = 'com.mac-monitoring.agent'
         else:
             raise NotImplementedError(
                 f"Service type '{service_type}' not supported. Only 'agent' "
                 "is supported as a service")
+        self.logging_formatter = logging_formatter
         self.plist_path = os.path.expanduser(
-            f'~/Library/LaunchAgents/{self.agent_name}.plist')
+            f'~/Library/LaunchAgents/{self.service_name}.plist')
 
     def abort(self):
-        raise NotImplementedError(red('abort() is not implemented!'))
+        raise NotImplementedError('abort() is not implemented!')
 
     def pause(self):
-        logger.debug(f"Pausing {self.service_type} '{self.agent_name}'...")
+        logger.debug(f"Pausing {self.service_type} '{self.service_name}'...")
         cmd = f'launchctl unload {self.plist_path}'
         result = subprocess.run(shlex.split(cmd), capture_output=True)
         return check_result(
             result,
             error_msg=f"The {self.service_type} couldn't be disabled",
             valid_msg=f'{self.service_type} disabled',
-            err_key='not find')
+            err_key='not find', logging_formatter=self.logging_formatter)
 
     def start(self):
-        logger.debug(f"Starting {self.service_type} '{self.agent_name}'...")
-        script_path = os.path.join(os.path.dirname(scripts.__file__), AGENT_SCRIPT)
+        logger.debug(f"Starting {self.service_type} '{self.service_name}'...")
+        script_path = os.path.join(os.path.dirname(scripts.__file__), SERVICE_SCRIPT)
+        if not os.path.exists(script_path):
+            raise FileNotFoundError(f'The service script is not foud: {script_path}')
         plist_content = f'''<?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC -//Apple Computer//DTD PLIST 1.0//EN http://www.apple.com/DTDs/PropertyList-1.0.dtd >
         <plist version="1.0">
           <dict>
             <key>Label</key>
-            <string>{self.agent_name}</string>
+            <string>{self.service_name}</string>
             <key>Program</key>
             <string>{script_path}</string>
             <key>KeepAlive</key>
@@ -68,25 +71,35 @@ class Service:
             f.write(plist_content)
         copy(tmp_file_plist, self.plist_path)
         remove_file(tmp_file_plist)
+        # TODO: important, check first if service is already loaded before overwriting plist
         cmd = f'launchctl load {self.plist_path}'
         result = subprocess.run(shlex.split(cmd), capture_output=True)
         return check_result(
             result,
             error_msg=f"The {self.service_type} couldn't be started",
             valid_msg=f'{self.service_type} started',
-            skip_key='already loaded')
+            skip_key='already loaded', logging_formatter=self.logging_formatter)
 
 
-def check_result(result, error_msg, valid_msg, err_key=None, skip_key=None):
+def check_result(result, error_msg, valid_msg, err_key=None, skip_key=None,
+                 logging_formatter='simple'):
+    # TODO: raise error to get traceback?
     stderr = result.stderr.decode().strip()
     if skip_key and stderr and stderr.find(skip_key):
         logger.warning(f'{warning()} {stderr}')
     elif result.returncode or (err_key and stderr.find(err_key) != -1):
-        logger.error(f"{error()} {error_msg}: {stderr}")
+        log_error(f'{error_msg}: {stderr}', logging_formatter)
         return 1
     else:
         logger.info(green(valid_msg))
         return 0
+
+
+def log_error(msg, logging_formatter='simple'):
+    if logging_formatter == 'only_msg':
+        logger.error(f'{error(msg)}')
+    else:
+        logger.error(f'{red(msg)}')
 
 
 def setup_argparser():
@@ -113,6 +126,13 @@ Script for monitoring your Mac.
         '-v', '--version', action='version',
         version=f'%(prog)s v{VERSION}',
         help="Show program's version number and exit.")
+    general_group.add_argument(
+        '-q', '--quiet', action='store_true',
+        help='Enable quiet mode, i.e. nothing will be printed.')
+    general_group.add_argument(
+        '--verbose', action='store_true',
+        help='Print various debugging information, e.g. print traceback '
+             'when there is an exception.')
     general_group.add_argument(
         '-u', '--use-config', dest='use_config', action='store_true',
         help='If this is enabled, the parameters found in the main '
@@ -171,7 +191,26 @@ Script for monitoring your Mac.
 
 
 def main():
+    main_cfg = None
+    # =====================
+    # Default logging setup
+    # =====================
+    # Setup the default logger (whose name is __main__ since this file is run
+    # as a script) which will be used for printing to the console before all
+    # loggers defined in the JSON file will be configured. The printing with
+    # this default logger will only be done in the cases that the user allows
+    # it, e.g. the verbose option is enabled.
+    # IMPORTANT: the config options need to be read before using any logger
+    logger.setLevel(logging.INFO)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(message)s")
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    logging_setup = False
     try:
+        # test = {}
+        # print(test['a'])
         exit_code = 0
         parser = setup_argparser()
         args = parser.parse_args()
@@ -192,8 +231,9 @@ def main():
                   verbose=main_cfg.verbose,
                   logging_level=main_cfg.logging_level,
                   logging_formatter=main_cfg.logging_formatter)
+        logging_setup = True
         process_returned_values(returned_values)
-        service = Service()
+        service = Service(logging_formatter=main_cfg.logging_formatter)
         if main_cfg.edit:
             exit_code = edit_file(main_cfg.edit, main_cfg.app, get_configs_dirpath())
         elif main_cfg.reset:
@@ -204,10 +244,22 @@ def main():
             exit_code = service.pause()
         elif main_cfg.abort_monitoring:
             exit_code = service.abort()
-    except AssertionError as e:
-        # TODO (IMPORTANT): use same logic as in other project
-        # TODO: add KeyboardInterruptError
-        logger.error(e)
+        else:
+            logger.warning(yellow('No action chosen!'))
+    except Exception as e:
+        if logging_setup:
+            logging_formatter = main_cfg.logging_formatter
+            verbose = main_cfg.verbose
+            if verbose:
+                value = e.args
+                value = (red(f'{value[0]}'),)
+                e.__setattr__('args', value)
+                logger.exception(e)
+            else:
+                log_error(e, logging_formatter)
+        else:
+            msg = "{}: {}".format(str(e.__class__).split("'")[1], e)
+            logger.exception(f'{error(msg)}')
         exit_code = 1
     return exit_code
 
