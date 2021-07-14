@@ -71,18 +71,12 @@ def load_agent(main_cfg):
   </dict>
 </plist>
     '''
-    """
-    with open(plist_path, 'w') as f:
-        f.write(plist_config)
-    """
     tmp_file_plist = tempfile.mkstemp(suffix='.plist')[1]
     with open(tmp_file_plist, 'w') as f:
         f.write(plist_content)
     copy(tmp_file_plist, plist_path)
     remove_file(tmp_file_plist)
     cmd = f'launchctl load {plist_path}'
-    # subprocess.run(shlex.split(cmd), shell=False)
-    # os.system(cmd)
     result = subprocess.run(shlex.split(cmd), capture_output=True)
     return check_result(result, "The agent couldn't be loaded", 'Agent loaded', skip_key='already loaded')
 
