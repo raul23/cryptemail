@@ -10,7 +10,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-import unicodedata
 from argparse import Namespace
 from collections import namedtuple, OrderedDict
 from logging import NullHandler
@@ -134,6 +133,10 @@ def copy(src, dst, clobber=True):
     else:
         logger.debug(f'Copying the file')
         shutil.copy(src, dst)
+
+
+def error():
+    return f"{COLORS['RED']}ERROR{COLORS['NC']}"
 
 
 def get_config_dict(cfg_type='main', configs_dirpath=None):
@@ -261,43 +264,6 @@ def load_json(filepath, encoding='utf8'):
         return data
 
 
-def mkdir(path):
-    # Since path can be relative to the cwd
-    path = os.path.abspath(path)
-    dirname = os.path.basename(path)
-    if os.path.exists(path):
-        logger.debug(f"Folder already exits: {path}")
-        logger.debug(f"Skipping it!")
-    else:
-        logger.debug(f"Creating folder '{dirname}': {path}")
-        os.mkdir(path)
-        logger.debug("Folder created!")
-
-
-def move(src, dst, clobber=True):
-    # TODO: necessary?
-    # Since path can be relative to the cwd
-    # src = os.path.abspath(src)
-    # filename = os.path.basename(src)
-    src = Path(src)
-    dst = Path(dst)
-    if dst.exists():
-        logger.debug(f'{dst.name}: file already exists')
-        logger.debug(f"Destination folder path: {dst.parent}")
-        if clobber:
-            logger.debug(f'{dst.name}: overwriting the file')
-            shutil.move(src, dst)
-            logger.debug("File moved!")
-        else:
-            logger.debug(f'{dst.name}: cannot overwrite existing file')
-            logger.debug(f"Skipping it!")
-    else:
-        logger.debug(f"Moving '{src.name}'...")
-        logger.debug(f"Destination folder path: {dst.parent}")
-        shutil.move(src, dst)
-        logger.debug("File moved!")
-
-
 def namespace_to_dict(ns):
     namspace_classes = [Namespace, SimpleNamespace]
     # TODO: check why not working anymore
@@ -419,10 +385,14 @@ def process_returned_values(returned_values):
         log_opts_overridden(returned_values.args_not_found_in_config, msg)
 
 
-# Ref.: https://bit.ly/3tTMlNF
-def remove_accents(text):
-    text = unicodedata.normalize('NFKD', text)
-    return "".join([c for c in text if not unicodedata.combining(c)])
+def remove_file(file_path):
+    # TODO add reference: https://stackoverflow.com/a/42641792
+    try:
+        os.remove(file_path)
+        return 0
+    except OSError as e:
+        logger.error(f'Error: {e.filename} - {e.strerror}.')
+        return 1
 
 
 def run_cmd(cmd):
@@ -514,10 +484,8 @@ def setup_log(package=None, configs_dirpath=None, quiet=False, verbose=False,
     logger.debug(main_log_msg)
 
 
-def touch(path, mode=0o666, exist_ok=True):
-    logger.debug(f"Creating file: '{path}'")
-    Path(path).touch(mode, exist_ok)
-    logger.debug("File created!")
+def warning():
+    return f"{COLORS['YELLOW']}WARNING{COLORS['NC']}"
 
 
 # -------------------------------
