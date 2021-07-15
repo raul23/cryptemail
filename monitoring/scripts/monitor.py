@@ -1,7 +1,7 @@
 import tempfile
 
 from monitoring import __name__ as PACKAGE_NAME, __version__ as VERSION
-from monitoring.configs import __path__, default_config as default_cfg
+from monitoring.configs import __path__, default_config as default_cfg, plist
 from monitoring.edit import edit_file, reset_file
 from monitoring import scripts
 from monitoring.utils.genutils import *
@@ -53,25 +53,15 @@ class Service:
         script_path = os.path.join(os.path.dirname(scripts.__file__), SERVICE_SCRIPT)
         if not os.path.exists(script_path):
             raise FileNotFoundError(f'The service script is not found: {script_path}')
-        plist_content = f'''<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC -//Apple Computer//DTD PLIST 1.0//EN http://www.apple.com/DTDs/PropertyList-1.0.dtd >
-<plist version="1.0">
-  <dict>
-    <key>Label</key>
-    <string>{self.service_name}</string>
-    <key>Program</key>
-    <string>{script_path}</string>
-    <key>KeepAlive</key>
-    <true/>
-  </dict>
-</plist>
-'''
+        plist_content = plist.plist_content.format(
+            service_name=self.service_name, script_path=script_path)
         tmp_file_plist = tempfile.mkstemp(suffix='.plist')[1]
         with open(tmp_file_plist, 'w') as f:
             f.write(plist_content)
         copy(tmp_file_plist, self.plist_path)
         remove_file(tmp_file_plist)
         # TODO: important, check first if service is already loaded before overwriting plist
+        # launchctl list
         cmd = f'launchctl load {self.plist_path}'
         result = subprocess.run(shlex.split(cmd), capture_output=True)
         return check_result(
