@@ -33,8 +33,8 @@ encrypted emails to a specified email account.
    
 Python dependencies
 ===================
-* Platform: macOS
-* Python:  2.7.15 and 3.7
+- **Platform:** macOS
+- **Python:**  2.7.15 and 3.7
 
 Install package
 ===============
