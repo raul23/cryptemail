@@ -52,10 +52,8 @@ To uninstall ``monitoring`` package:
  
     monitor -u
     
-`:information_source:`
-
-  The ``-u, --uninstall`` flag will remove all config files prior to 
-  uninstalling the ``monitoring`` package.
+**NOTE:** The ``-u, --uninstall`` flag will remove all config files prior to 
+uninstalling the ``monitoring`` package.
 
 ..
  .. code-block:: bash
