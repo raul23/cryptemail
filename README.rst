@@ -52,8 +52,6 @@ To uninstall ``monitoring`` package:
  
    monitor -u
 
-|
-
 **NOTE:** The ``-u, --uninstall`` flag will remove all config files prior to 
 uninstalling the ``monitoring`` package.
 
