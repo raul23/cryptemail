@@ -1,17 +1,27 @@
 #!/usr/bin/env python
-import os
-import time
+import shlex
+import subprocess
 import sys
 
 
+def send_alert():
+    pass
+
+
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
+    if len(sys.argv) == 3:
         last = sys.argv[1]
-        event_msg_contains = sys.argv[2]
-        os.system('echo "{} {}" >> '.format(last, event_msg_contains) +
-                  os.path.expanduser('~/foostore.txt'))
-        time.sleep(1)
-        """
-        os.system(f"log show --last {last} --style syslog --predicate "
-                  f"'eventMessage contains \"{event_msg_contains}\"'")
-        """
+        predicate = sys.argv[2]
+        cmd = "log show --last {} --style syslog --predicate \'{}\'".format(
+                last, predicate)
+        try:
+            result = subprocess.check_output(shlex.split(cmd),
+                                             stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
+            sys.exit(1)
+        import ipdb
+        ipdb.set_trace()
+        result = result.decode()
+        if result.count('\n') > 1:
+            pass
+    sys.exit(0)
