@@ -260,16 +260,15 @@ def uninstall(logging_formatter):
     logger.debug(f"Uninstalling {PROJECT_NAME}...")
     logger.debug('Removing user config files')
     remove_file(os.path.join(__path__[0], 'config.py'))
-    # remove_file(os.path.join(__path__[0], 'logging.py'))
-    cmd = f'pip uninstall {PROJECT_NAME}'
+    remove_file(os.path.join(__path__[0], 'logging.py'))
+    cmd = f'pip uninstall -y {PROJECT_NAME}'
     result = subprocess.run(shlex.split(cmd), capture_output=True)
-    if check_result(result,
-                    error_msg=f"{PROJECT_NAME} couldn't be uninstalled",
-                    valid_msg=f'{PROJECT_NAME} was uninstalled',
-                    skip_key='Skipping',
-                    logging_formatter=logging_formatter) == 0:
-        pass
-    return 0
+    return check_result(
+        result,
+        error_msg=f"{PROJECT_NAME} couldn't be uninstalled",
+        valid_msg=f'{PROJECT_NAME} was uninstalled',
+        skip_key='Skipping',
+        logging_formatter=logging_formatter)
 
 
 def main():
