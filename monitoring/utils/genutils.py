@@ -467,7 +467,7 @@ def color(msg, msg_color='y', bold=False):
 
 
 def error(msg):
-    return f'ERROR {red(msg)}'
+    return f"{red('ERROR')} {msg}"
 
 
 def default(default_value):
@@ -490,6 +490,10 @@ def usage(script_filename):
 
 def warning():
     return f"{color('WARNING', 'y')}"
+
+
+def blue(msg):
+    return f"{color(msg, 'b')}"
 
 
 def green(msg):
