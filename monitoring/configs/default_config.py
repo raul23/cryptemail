@@ -25,5 +25,17 @@ reset = None
 abort_monitoring = False
 pause_monitoring = False
 start_monitoring = False
-force = False
-stealth = False
+restart_monitoring = False
+service_type = 'agent'
+
+# 3.2 Report options
+# ========================
+local = False
+email = False
+encrypt = False
+
+# 3.2 Failed login options
+# ========================
+predicate = 'eventMessage contains "Failed to authenticate"'
+action = None
+delay_action = None
