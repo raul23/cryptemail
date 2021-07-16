@@ -48,10 +48,12 @@ Uninstall package
 =================
 To uninstall ``monitoring`` package:
 
- .. code-block:: bash
+.. code-block:: bash
  
-    monitor -u
-    
+   monitor -u
+
+|
+
 **NOTE:** The ``-u, --uninstall`` flag will remove all config files prior to 
 uninstalling the ``monitoring`` package.
 
