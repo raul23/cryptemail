@@ -38,7 +38,7 @@ Python dependencies
 
 Install package
 ===============
-To install ``monitoring`` package:
+To install the ``monitoring`` package:
 
 .. code-block:: bash
 
@@ -46,7 +46,7 @@ To install ``monitoring`` package:
 
 Uninstall package
 =================
-To uninstall ``monitoring`` package:
+To uninstall the ``monitoring`` package:
 
 .. code-block:: bash
  
