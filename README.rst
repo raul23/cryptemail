@@ -48,11 +48,20 @@ Uninstall package
 =================
 To uninstall ``monitoring`` package:
 
-.. code-block:: bash
-
-   pip uninstall mac-monitoring
-   
+ .. code-block:: bash
+ 
+    monitor -u
+    
 `:information_source:`
+
+  The ``-u, --uninstall`` flag will remove all config files.
+
+..
+ .. code-block:: bash
+
+    pip uninstall mac-monitoring
+   
+.. `:information_source:`
 
    When uninstalling the ``monitoring`` package, you might be informed
    that the configuration files *logging.py* and *config.py* won't be
