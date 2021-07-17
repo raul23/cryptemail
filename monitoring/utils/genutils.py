@@ -25,7 +25,6 @@ logger = init_log(__name__, __file__)
 logger.addHandler(NullHandler())
 
 CFG_TYPES = ['main', 'log']
-CONFIGS_DIRNAME = 'configs'
 
 COLORS = {
     'GREEN': '\033[0;36m',  # 32
@@ -36,7 +35,6 @@ COLORS = {
     'BOLD': '\033[1m',
     'NC': '\033[0m',
 }
-
 _COLOR_TO_CODE = {
     'g': COLORS['GREEN'],
     'r': COLORS['RED'],
@@ -177,8 +175,6 @@ def load_cfg_dict(cfg_filepath, cfg_type):
     try:
         cfg_dict = _load_cfg_dict(cfg_filepath, cfg_type)
     except FileNotFoundError as e:
-        print(f"WARNING: Config file '{os.path.basename(cfg_filepath)}' will "
-              "be created")
         # Copy it from the default one
         # TODO: IMPORTANT destination with default?
         if cfg_type == 'main':
@@ -186,6 +182,7 @@ def load_cfg_dict(cfg_filepath, cfg_type):
         else:
             src = get_logging_filepath(configs_dirpath, default_config=True)
         shutil.copy(src, cfg_filepath)
+        print(f"Config file created: {cfg_filepath}")
         cfg_dict = _load_cfg_dict(cfg_filepath, cfg_type)
     return cfg_dict
 
@@ -231,6 +228,19 @@ def load_json(filepath, encoding='utf8'):
         raise
     else:
         return data
+
+
+def mkdir(path):
+    # Since path can be relative to the cwd
+    path = os.path.abspath(path)
+    dirname = os.path.basename(path)
+    if os.path.exists(path):
+        logger.debug(f"Folder already exits: {path}")
+        logger.debug(f"Skipping it!")
+    else:
+        logger.debug(f"Creating folder '{dirname}': {path}")
+        os.mkdir(path)
+        logger.debug("Folder created!")
 
 
 def namespace_to_dict(ns):
@@ -299,8 +309,6 @@ def override_config_with_args(main_config, args, default_config, use_config=Fals
                     else:
                         config.setdefault(arg_name, default_val)
                 else:
-                    # import ipdb
-                    # ipdb.set_trace()
                     raise AttributeError("No value could be found for the "
                                          f"argument '{arg_name}'")
 
@@ -518,6 +526,9 @@ def get_configs_dirpath():
 
 def get_logging_filepath(configs_dirpath=None, default_config=False):
     configs_dirpath = get_configs_dirpath() if configs_dirpath is None else configs_dirpath
+    if default_config and not os.path.exists(os.path.join(configs_dirpath, 'default_logging.py')):
+        default_config = True
+        configs_dirpath = get_configs_dirpath()
     if default_config:
         return os.path.join(configs_dirpath, 'default_logging.py')
     else:
@@ -526,6 +537,9 @@ def get_logging_filepath(configs_dirpath=None, default_config=False):
 
 def get_main_config_filepath(configs_dirpath=None, default_config=False):
     configs_dirpath = get_configs_dirpath() if configs_dirpath is None else configs_dirpath
+    if default_config and not os.path.exists(os.path.join(configs_dirpath, 'default_config.py')):
+        default_config = True
+        configs_dirpath = get_configs_dirpath()
     if default_config:
         return os.path.join(configs_dirpath, 'default_config.py')
     else:
