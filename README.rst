@@ -52,7 +52,7 @@ To uninstall only the ``monitoring`` package:
  
    monitor -u
    
-**NOTE:** the config files and reports will be left in the ``~/mac-monitoring`` directory
+**NOTE:** the config files and reports will still be left in the ``~/mac-monitoring`` directory
 
 |
 
