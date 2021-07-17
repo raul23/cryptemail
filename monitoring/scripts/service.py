@@ -19,6 +19,18 @@ DB_NAME = 'report.db'
 TABLE_NAME = 'alerts'
 
 
+def actual_timestamp_exists(conn, table_name, actual_timestamp):
+    c = conn.cursor()
+    # TODO: check table_name exist
+    sql = "SELECT count(actual_timestamp) FROM {} WHERE actual_timestamp=?".format(table_name)
+    c.execute(sql, (actual_timestamp,))
+    result = c.fetchone()
+    if result[0] == 1:
+        return True
+    else:
+        return False
+
+
 def add_timestamp(msg):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     return '{}  {}'.format(timestamp, msg)
@@ -63,6 +75,15 @@ def table_exists(conn, table_name):
         return False
 
 
+def insert_log(conn, table_name, values):
+    c = conn.cursor()
+    sql = '''INSERT INTO {} (actual_timestamp, detection_timestamp, process, 
+    PID, message, user, error_number, alert_type) VALUES 
+    (?, ?, ?, ?, ?, ?, ?, ?)'''.format(table_name)
+    c.execute(sql, values)
+    return c.lastrowid
+
+
 def main():
     exit_code = 0
     try:
@@ -73,13 +94,14 @@ def main():
                 r"(?P<message>.+) <(?P<user>.+)> (?P<error_number>.+)"
         sleeping = 2
         sql_create_table = """CREATE TABLE IF NOT EXISTS {} (
-                                  long_timestamp text PRIMARY KEY NOT NULL,
-                                  short_timestamp text NOT NULL,
+                                  actual_timestamp text PRIMARY KEY NOT NULL,
+                                  detection_timestamp text NOT NULL,
                                   process text NOT NULL,
                                   PID integer NOT NULL,
                                   message text NOT NULL,
                                   user text NOT NULL,
-                                  error_number integer NOT NULL
+                                  error_number integer NOT NULL,
+                                  alert_type text NOT NULL
                               );""".format(TABLE_NAME)
         timestamps_checked = []
         if len(sys.argv) == number_of_args or True:
@@ -94,7 +116,7 @@ def main():
             if table_exists(conn, TABLE_NAME):
                 log("Table '{}' already exists".format(TABLE_NAME), 'debug')
             else:
-                log("INFO : Creating the table '{}'".format(TABLE_NAME))
+                log("Creating the table '{}'".format(TABLE_NAME))
                 create_table(conn, sql_create_table)
             while True:
                 log('Executing log command', 'debug')
@@ -107,6 +129,7 @@ def main():
                     log('Error with log command: {}'.format(e.__repr__()), 'error')
                     exit_code = 1
                     break
+                detection_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 result = result.decode()
                 # Don't include first '\n' which is for the row "Timestamp (process)[PID]"
                 failed_login_counts = result.count('\n') - 1
@@ -115,12 +138,28 @@ def main():
                     matches = re.finditer(regex, result, re.MULTILINE)
                     for matchNum, match in enumerate(matches, start=1):
                         groupdict = match.groupdict()
+                        # Check if the timestamp is already in the db
+                        if actual_timestamp_exists(conn, TABLE_NAME, groupdict['timestamp']):
+                            continue
+                        alert('{} \|\| {} {} {}'.format(detection_timestamp,
+                                                        groupdict['timestamp'],
+                                                        groupdict['message'],
+                                                        groupdict['user']),
+                              use_timestamp=False)
+                        values = (groupdict['timestamp'], detection_timestamp,
+                                  groupdict['process'], groupdict['PID'],
+                                  groupdict['message'], groupdict['user'],
+                                  groupdict['error_number'], 'failed_login')
+                        insert_log(conn, TABLE_NAME, values)
+                        # NOTE: groupdict.values() in 2.7 not in order (timestamp first and so on)
+                        """
                         if groupdict['timestamp'] in timestamps_checked:
                             continue
                         timestamps_checked.append(groupdict['timestamp'])
                         alert('\|\| {} {} {}'.format(groupdict['timestamp'],
                                                      groupdict['message'],
                                                      groupdict['user']))
+                        """
                 else:
                     log('Nothing to report!', 'debug')
                 log('Sleeping for {} seconds'.format(sleeping))
@@ -130,7 +169,7 @@ def main():
                 'arguments'.format(len(sys.argv), number_of_args), 'error')
         log('WARNING: Ending!')
     except sqlite3.Error as e:
-        log(e)
+        log(e, 'error')
         exit_code = 1
     except KeyboardInterrupt as e:
         log('Ctrl+c detected!')
