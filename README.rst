@@ -34,11 +34,11 @@ encrypted emails to a specified email account.
 Python dependencies
 ===================
 - **Platform:** macOS
-- **Python:**  2.7.15 and 3.7
+- **Python:**  3.7+
 
 Install package
 ===============
-To install ``monitoring`` package:
+To install the ``monitoring`` package:
 
 .. code-block:: bash
 
@@ -46,13 +46,21 @@ To install ``monitoring`` package:
 
 Uninstall package
 =================
-To uninstall ``monitoring`` package:
+To uninstall the ``monitoring`` package:
 
 .. code-block:: bash
+ 
+   monitor -u
 
-   pip uninstall mac-monitoring
+**NOTE:** The ``-u`` flag will remove all config files prior to 
+uninstalling the ``monitoring`` package.
+
+..
+ .. code-block:: bash
+
+    pip uninstall mac-monitoring
    
-`:information_source:`
+.. `:information_source:`
 
    When uninstalling the ``monitoring`` package, you might be informed
    that the configuration files *logging.py* and *config.py* won't be
