@@ -1,16 +1,20 @@
+import shutil
 import tempfile
 
 from monitoring import __name__ as PACKAGE_NAME, __version__ as VERSION
-from monitoring.configs import __path__, default_config as default_cfg, plist
+from monitoring.configs import default_config as default_cfg, plist
 from monitoring.edit import edit_file, reset_file
 from monitoring import scripts
 from monitoring.utils.genutils import *
 from monitoring.utils.logutils import init_log
 
 logger = init_log(__name__, __file__)
+
 LOG_CFG = 'log'
 MAIN_CFG = 'main'
 PROJECT_NAME = 'mac-monitoring'
+PROG_DIR = os.path.expanduser(f'~/{PROJECT_NAME}')
+CONFIGS_PATH = PROG_DIR
 SERVICE_SCRIPT = 'service.py'
 
 # =====================
@@ -55,8 +59,9 @@ class Service:
         script_path = os.path.join(os.path.dirname(scripts.__file__), SERVICE_SCRIPT)
         if not os.path.exists(script_path):
             raise FileNotFoundError(f'The service script is not found: {script_path}')
-        plist_content = plist.plist_content.format(
-            service_name=self.service_name, script_path=script_path)
+        plist_content = plist.plist_content.format(service_name=self.service_name,
+                                                   script_path=script_path,
+                                                   configs_path=CONFIGS_PATH)
         tmp_file_plist = tempfile.mkstemp(suffix='.plist')[1]
         with open(tmp_file_plist, 'w') as f:
             f.write(plist_content)
@@ -139,18 +144,24 @@ Script for monitoring your Mac.
     """
     general_group.add_argument(
         '--log-level', dest='logging_level',
-        choices=['debug', 'info', 'warning', 'error'], default=LOGGING_LEVEL,
+        choices=['debug', 'info', 'warning', 'error'],  # default=LOGGING_LEVEL,
         help='Set logging level for all loggers.'
              + default(LOGGING_LEVEL))
     # TODO: explain each format
     general_group.add_argument(
         '--log-format', dest='logging_formatter',
-        choices=['console', 'simple', 'only_msg'], default=LOGGING_FORMATTER,
+        choices=['console', 'simple', 'only_msg'],  # default=LOGGING_FORMATTER,
         help='Set logging formatter for all loggers.'
              + default(LOGGING_FORMATTER))
-    general_group.add_argument(
-        '-u', '--uninstall', action='store_true',
-        help='Uninstall program.')
+    # =================
+    # Uninstall options
+    # =================
+    uninstall_group = parser.add_argument_group(f"{yellow('Uninstall options')}")
+    uninstall_group.add_argument(
+        '-u', '--uninstall', action='store_true', help='Uninstall the program.')
+    uninstall_group.add_argument(
+        '--all', action='store_true', dest='clear_all',
+        help='Remove everything including config files and reports.')
     # ================
     # Edit/reset files
     # ================
@@ -163,7 +174,7 @@ Script for monitoring your Mac.
              f'(`{MAIN_CFG}`) or the logging configuration file (`{LOG_CFG}`).'
              + default(EDIT))
     edit_group.add_argument(
-        "--app", dest="app", default=None,
+        "--app", dest="app",  # default=None,
         help='''Name of the application to use for editing the file. If no 
             name is given, then the default application for opening this type of
             file will be used.''' + default(APP))
@@ -256,11 +267,17 @@ Script for monitoring your Mac.
     return parser
 
 
-def uninstall(logging_formatter):
+def uninstall(logging_formatter, clear_all=False):
     logger.debug(f"Uninstalling {PROJECT_NAME}...")
-    logger.debug('Removing user config files')
-    remove_file(os.path.join(__path__[0], 'config.py'))
-    remove_file(os.path.join(__path__[0], 'logging.py'))
+    if clear_all:
+        """
+        logger.debug('Removing user config files')
+        remove_file(os.path.join(PROG_DIR, 'config.py'))
+        remove_file(os.path.join(PROG_DIR, 'logging.py'))
+        """
+        logger.debug(f'Remove program directory: {PROG_DIR}')
+        shutil.rmtree(PROG_DIR)
+        logger.debug('Removed!')
     cmd = f'pip uninstall -y {PROJECT_NAME}'
     result = subprocess.run(shlex.split(cmd), capture_output=True)
     return check_result(
@@ -290,20 +307,26 @@ def main():
     logger.addHandler(ch)
     logging_setup = False
     try:
+        # TODO: testing code
         # test = {}
         # print(test['a'])
         exit_code = 0
         parser = setup_argparser()
         args = parser.parse_args()
-        # TODO: find if you can do it in setup_argparser()
+        # TODO: can you do it in setup_argparser()
         if args.app and not args.edit:
             msg = red('error: argument -a/--app: required with argument -e/--edit')
             print(f"\n{msg}")
             return 1
         # Get main cfg dict
         # TODO: important, check if an option is defined more than once
-        configs_dirpath = __path__[0]
+        if not os.path.exists(PROG_DIR):
+            logger.debug(f"Creating program directory: {PROG_DIR}")
+            mkdir(PROG_DIR)
+            logger.info(f"Program directory created: {PROG_DIR}")
+        configs_dirpath = CONFIGS_PATH
         main_cfg = argparse.Namespace(**get_config_dict('main', configs_dirpath))
+        # TODO: testing code
         # test = args
         # import ipdb
         # ipdb.set_trace()
@@ -319,11 +342,11 @@ def main():
         process_returned_values(returned_values)
         service = Service(logging_formatter=main_cfg.logging_formatter)
         if main_cfg.uninstall:
-            exit_code = uninstall(main_cfg.logging_formatter)
+            exit_code = uninstall(main_cfg.logging_formatter, main_cfg.clear_all)
         elif main_cfg.edit:
-            exit_code = edit_file(main_cfg.edit, main_cfg.app, get_configs_dirpath())
+            exit_code = edit_file(main_cfg.edit, main_cfg.app, configs_dirpath)
         elif main_cfg.reset:
-            exit_code = reset_file(main_cfg.reset, get_configs_dirpath())
+            exit_code = reset_file(main_cfg.reset, configs_dirpath)
         elif main_cfg.start_monitoring:
             exit_code = service.start()
         elif main_cfg.pause_monitoring:
