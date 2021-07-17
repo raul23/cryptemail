@@ -1,4 +1,3 @@
-import shutil
 import tempfile
 
 from monitoring import __name__ as PACKAGE_NAME, __version__ as VERSION
@@ -15,7 +14,8 @@ MAIN_CFG = 'main'
 PROJECT_NAME = 'mac-monitoring'
 PROG_DIR = os.path.expanduser(f'~/{PROJECT_NAME}')
 CONFIGS_PATH = PROG_DIR
-SERVICE_SCRIPT = 'service.py'
+SERVICE_SCRIPT_NAME = 'service.py'
+SERVICE_SCRIPT_PATH = os.path.join(PROG_DIR, SERVICE_SCRIPT_NAME)
 
 # =====================
 # Default config values
@@ -40,6 +40,7 @@ class Service:
         self.logging_formatter = logging_formatter
         self.plist_path = os.path.expanduser(
             f'~/Library/LaunchAgents/{self.service_name}.plist')
+        self.script_path = SERVICE_SCRIPT_PATH
 
     def abort(self):
         raise NotImplementedError('abort() is not implemented!')
@@ -56,18 +57,22 @@ class Service:
 
     def start(self):
         logger.debug(f"Starting {self.service_type} '{self.service_name}'...")
-        script_path = os.path.join(os.path.dirname(scripts.__file__), SERVICE_SCRIPT)
-        if not os.path.exists(script_path):
-            raise FileNotFoundError(f'The service script is not found: {script_path}')
+        src = os.path.join(os.path.dirname(scripts.__file__), SERVICE_SCRIPT_NAME)
+        copy(src, self.script_path)
+        # TODO: remove following lines
+        """
+        if not os.path.exists(self.script_path):
+            raise FileNotFoundError(f'The service script is not found: {self.script_path}')
+        """
         plist_content = plist.plist_content.format(service_name=self.service_name,
-                                                   script_path=script_path,
+                                                   script_path=self.script_path,
                                                    configs_path=CONFIGS_PATH)
         tmp_file_plist = tempfile.mkstemp(suffix='.plist')[1]
         with open(tmp_file_plist, 'w') as f:
             f.write(plist_content)
         copy(tmp_file_plist, self.plist_path)
         remove_file(tmp_file_plist)
-        # TODO: important, check first if service is already loaded before overwriting plist
+        # TODO: important, check first if service is already loaded before overwriting service.py and plist
         # launchctl list
         cmd = f'launchctl load {self.plist_path}'
         result = subprocess.run(shlex.split(cmd), capture_output=True)
