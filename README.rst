@@ -46,43 +46,21 @@ To install the ``monitoring`` package:
 
 Uninstall package
 =================
-To uninstall the ``monitoring`` package:
+To uninstall only the ``monitoring`` package:
 
 .. code-block:: bash
  
    monitor -u
-
-**NOTE:** The ``-u`` flag will remove all config files prior to 
-uninstalling the ``monitoring`` package.
-
-..
- .. code-block:: bash
-
-    pip uninstall mac-monitoring
    
-.. `:information_source:`
+**NOTE:** the config files and reports will still be left in the ``~/mac-monitoring`` directory
 
-   When uninstalling the ``monitoring`` package, you might be informed
-   that the configuration files *logging.py* and *config.py* won't be
-   removed by *pip*. You can remove those files manually by noting their paths
-   returned by *pip*. Or you can leave them so your saved settings can be
-   re-used the next time you re-install the package.
+|
 
-   **Example:** uninstall the package and remove the config files
+If you want to also remove all config files and reports, use also the ``--all`` flag:
 
-   .. code-block:: console
-   
-      $ pip uninstall mac-monitoring
-      Found existing installation: mac-monitoring 0.1.0a1
-      Uninstalling mac-monitoring-0.1.0a1:
-        Would remove:
-          /Users/test/miniconda3/envs/monitor37/bin/monitor
-          /Users/test/miniconda3/envs/monitor37/lib/python3.7/site-packages/mac_monitoring-0.1.0a1.dist-info/*
-          /Users/test/miniconda3/envs/monitor37/lib/python3.7/site-packages/monitoring/*
-        Would not remove (might be manually added):
-          /Users/test/miniconda3/envs/monitor37/lib/python3.7/site-packages/monitoring/configs/config.py
-          /Users/test/miniconda3/envs/monitor37/lib/python3.7/site-packages/monitoring/configs/logging.py
-      Proceed (y/n)? y
-        Successfully uninstalled mac-monitoring-0.1.0a1
-      $ rm -r /Users/test/miniconda3/envs/monitor37/lib/python3.7/site-packages/monitoring/
-   
+.. code-block:: bash
+ 
+   monitor -u --all
+
+**NOTE:** the ``--all`` flag will also remove the whole ``~/mac-monitoring`` directory along 
+with all files in it (e.g. config files)
