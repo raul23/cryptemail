@@ -19,22 +19,6 @@ SERVICE_NAME = f'com.{PROJECT_NAME}.service'
 SERVICE_SCRIPT_NAME = 'service.py'
 SERVICE_SCRIPT_PATH = os.path.join(PROG_DIR, SERVICE_SCRIPT_NAME)
 
-# =====================
-# Default config values
-# =====================
-ACTION = default_cfg.action
-APP = default_cfg.app
-DELAY_ACTION = default_cfg.delay_action
-EDIT = default_cfg.edit
-END = default_cfg.end
-LOG_FORMAT = default_cfg.log_format
-LOG_LEVEL = default_cfg.log_level
-PREDICATE = default_cfg.predicate
-RESET = default_cfg.reset
-SERVICE_TYPE = default_cfg.service_type
-SHOW = default_cfg.show
-START = default_cfg.start
-
 
 class Monitor:
     def __init__(self, config, configs_path):
@@ -201,13 +185,13 @@ Script for monitoring your Mac.
         '-l', '--log-level', dest='log_level',
         choices=['debug', 'info', 'warning', 'error'],  # default=LOGGING_LEVEL,
         help='Set logging level for all loggers.'
-             + default(LOG_LEVEL))
+             + default(default_cfg.log_level))
     # TODO: explain each format
     general_group.add_argument(
         '-f', '--log-format', dest='log_format',
         choices=['console', 'simple', 'only_msg'],  # default=LOGGING_FORMATTER,
         help='Set logging formatter for all loggers.'
-             + default(LOG_FORMAT))
+             + default(default_cfg.log_format))
     # =================
     # Uninstall options
     # =================
@@ -227,17 +211,17 @@ Script for monitoring your Mac.
         "-e", "--edit", choices=[LOG_CFG, MAIN_CFG],
         help='Edit a configuration file, either the main configuration file '
              f'(`{MAIN_CFG}`) or the logging configuration file (`{LOG_CFG}`).'
-             + default(EDIT))
+             + default(default_cfg.edit))
     edit_group.add_argument(
         "--app", dest="app",  # default=None,
         help='''Name of the application to use for editing the file. If no 
             name is given, then the default application for opening this type of
-            file will be used.''' + default(APP))
+            file will be used.''' + default(default_cfg.app))
     parser_edit_mutual_group.add_argument(
         '--reset', choices=[LOG_CFG, MAIN_CFG],
         help='Reset a configuration file to factory values. It can either be '
              f'the main configuration file (`{MAIN_CFG}`) or the logging '
-             f'configuration file (`{LOG_CFG}`).' + default(RESET))
+             f'configuration file (`{LOG_CFG}`).' + default(default_cfg.reset))
     # ==================
     # Monitoring options
     # ==================
@@ -257,17 +241,17 @@ Script for monitoring your Mac.
         help='Restart system monitoring.')
     monitor_group.add_argument(
         '-t', '--service-type', choices=['agent', 'daemon'],
-        help='Type of service to install.' + default(SERVICE_TYPE))
+        help='Type of service to install.' + default(default_cfg.service_type))
     # ==============
     # Report options
     # ==============
     report_group = parser.add_argument_group(f"{yellow('Report options')}")
     report_group.add_argument(
-        '--show', metavar='NUM', help=f'Show last {SHOW} logs.' + default(SHOW))
+        '--show', metavar='NUM', help=f'Show last {default_cfg.show} logs.' + default(default_cfg.show))
     report_group.add_argument(
-        '--start', metavar='YYYY-MM-DD HH:MM:SS', help='TODO.' + default(START))
+        '--start', metavar='YYYY-MM-DD HH:MM:SS', help='TODO.' + default(default_cfg.start))
     report_group.add_argument(
-        '--end', metavar='YYYY-MM-DD HH:MM:SS', help='TODO.' + default(END))
+        '--end', metavar='YYYY-MM-DD HH:MM:SS', help='TODO.' + default(default_cfg.end))
     report_group.add_argument(
         '--email', action="store_true", help='Send the alerts as emails.')
     report_group.add_argument(
@@ -282,12 +266,12 @@ Script for monitoring your Mac.
     failed_group.add_argument(
         '--predicate', metavar='FILTER',
         help='Filter messages based on the provided predicate, based on '
-             'NSPredicate.' + default(PREDICATE))
+             'NSPredicate.' + default(default_cfg.predicate))
     failed_group.add_argument(
         '--action',
         help='Action to be performed right after a failed login attempt is '
              'detected. Supported action can be one of the following: '
-             'take-picture, shutdown or a path to a script.' + default(ACTION))
+             'take-picture, shutdown or a path to a script.' + default(default_cfg.action))
     # TODO: use the following important message
     """
         help='Action to be performed right after a failed login attempt is '
@@ -299,7 +283,7 @@ Script for monitoring your Mac.
     failed_group.add_argument(
         '-d', '--delay-action', metavar='SECONDS',
         help='Delay in seconds to wait before starting the action.'
-             + default(DELAY_ACTION))
+             + default(default_cfg.delay_action))
     # ===========
     # Set options
     # ===========
