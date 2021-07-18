@@ -27,8 +27,8 @@ APP = default_cfg.app
 DELAY_ACTION = default_cfg.delay_action
 EDIT = default_cfg.edit
 END = default_cfg.end
-LOGGING_FORMATTER = default_cfg.logging_formatter
-LOGGING_LEVEL = default_cfg.logging_level
+LOG_FORMAT = default_cfg.log_format
+LOG_LEVEL = default_cfg.log_level
 PREDICATE = default_cfg.predicate
 RESET = default_cfg.reset
 SERVICE_TYPE = default_cfg.service_type
@@ -36,8 +36,48 @@ SHOW = default_cfg.show
 START = default_cfg.start
 
 
+class Monitor:
+    def __init__(self, config, configs_path):
+        self.config = config
+        self.configs_path = configs_path
+        self.service = Service(log_format=self.config.log_format)
+
+    def _uninstall(self):
+        logger.debug(f"Uninstalling {PROJECT_NAME}...")
+        if self.config.clear_all:
+            logger.debug(f'Remove program directory: {PROG_DIR}')
+            shutil.rmtree(PROG_DIR)
+            logger.debug('Removed!')
+        cmd = f'pip uninstall -y {PROJECT_NAME}'
+        result = subprocess.run(shlex.split(cmd), capture_output=True)
+        return check_result(
+            result,
+            error_msg=f"{PROJECT_NAME} couldn't be uninstalled",
+            valid_msg=f'{PROJECT_NAME} was uninstalled',
+            skip_key='Skipping',
+            log_format=self.config.log_format)
+
+    def run(self):
+        exit_code = 0
+        if self.config.uninstall:
+            exit_code = self._uninstall()
+        elif self.config.edit:
+            exit_code = edit_file(self.config.edit, self.config.app, self.configs_path)
+        elif self.config.reset:
+            exit_code = reset_file(self.config.reset, self.configs_path)
+        elif self.config.start_monitoring:
+            exit_code = self.service.start()
+        elif self.config.pause_monitoring:
+            exit_code = self.service.pause()
+        elif self.config.abort_monitoring:
+            exit_code = self.service.abort()
+        else:
+            logger.warning(yellow('No action chosen!'))
+        return exit_code
+
+
 class Service:
-    def __init__(self, service_type='agent', logging_formatter='simple'):
+    def __init__(self, service_type='agent', log_format='simple'):
         self.service_type = service_type
         if service_type == 'agent':
             self.service_name = f'{SERVICE_NAME}.agent'
@@ -46,7 +86,7 @@ class Service:
             raise NotImplementedError(
                 f"Service type '{service_type}' not supported. Only 'agent' "
                 "is supported as a service")
-        self.logging_formatter = logging_formatter
+        self.log_format = log_format
         self.plist_path = os.path.expanduser(
             f'~/Library/LaunchAgents/{self.service_name}.plist')
         self.script_path = SERVICE_SCRIPT_PATH
@@ -60,19 +100,15 @@ class Service:
         result = subprocess.run(shlex.split(cmd), capture_output=True)
         return check_result(
             result,
-            error_msg=f"The {self.service_type} couldn't be disabled",
-            valid_msg=f'{self.service_type} disabled',
-            err_key='not find', logging_formatter=self.logging_formatter)
+            error_msg=f"The {self.service_type} couldn't be paused",
+            valid_msg=f'{self.service_type} paused',
+            err_keys=['not find', 'No such file or directory'],
+            log_format=self.log_format)
 
     def start(self):
         logger.debug(f"Starting {self.service_type} '{self.service_name}'...")
         src = os.path.join(os.path.dirname(scripts.__file__), SERVICE_SCRIPT_NAME)
         copy(src, self.script_path)
-        # TODO: remove following lines
-        """
-        if not os.path.exists(self.script_path):
-            raise FileNotFoundError(f'The service script is not found: {self.script_path}')
-        """
         plist_content = plist.plist_content.format(service_name=self.service_name,
                                                    script_path=self.script_path,
                                                    configs_path=CONFIGS_PATH)
@@ -85,30 +121,37 @@ class Service:
         # launchctl list
         cmd = f'launchctl load {self.plist_path}'
         result = subprocess.run(shlex.split(cmd), capture_output=True)
+        import ipdb
+        ipdb.set_trace()
         return check_result(
             result,
             error_msg=f"The {self.service_type} couldn't be started",
             valid_msg=f'{self.service_type} started',
-            skip_key='already loaded', logging_formatter=self.logging_formatter)
+            skip_keys=['already loaded'], log_format=self.log_format)
 
 
-def check_result(result, error_msg, valid_msg, err_key=None, skip_key=None,
-                 logging_formatter='simple'):
+def check_result(result, error_msg, valid_msg, err_keys=None, skip_keys=None,
+                 log_format='simple'):
+    def find_key(msg, keys):
+        for key in keys:
+            if msg.find(key) != -1:
+                return True
+        return False
     # TODO: raise error to get traceback?
     stderr = result.stderr.decode().strip()
     stderr = stderr.replace('WARNING:', '').replace('ERROR:', '').strip()
-    if skip_key and stderr and stderr.find(skip_key) != -1:
+    if skip_keys and stderr and find_key(stderr, skip_keys):
         logger.warning(f'{warning()} {stderr}')
-    elif result.returncode or (err_key and stderr.find(err_key) != -1):
-        log_error(f'{error_msg}: {stderr}', logging_formatter)
+    elif result.returncode or (err_keys and find_key(stderr, err_keys)):
+        log_error(f'{error_msg}: {stderr}', log_format)
         return 1
     else:
         logger.info(green(valid_msg))
         return 0
 
 
-def log_error(msg, logging_formatter='simple'):
-    if logging_formatter == 'only_msg':
+def log_error(msg, log_format='simple'):
+    if log_format == 'only_msg':
         logger.error(f'{error(msg)}')
     else:
         logger.error(f'{red(msg)}')
@@ -157,16 +200,16 @@ Script for monitoring your Mac.
              'config file config.py will be used.')
     """
     general_group.add_argument(
-        '-l', '--log-level', dest='logging_level',
+        '-l', '--log-level', dest='log_level',
         choices=['debug', 'info', 'warning', 'error'],  # default=LOGGING_LEVEL,
         help='Set logging level for all loggers.'
-             + default(LOGGING_LEVEL))
+             + default(LOG_LEVEL))
     # TODO: explain each format
     general_group.add_argument(
-        '-f', '--log-format', dest='logging_formatter',
+        '-f', '--log-format', dest='log_format',
         choices=['console', 'simple', 'only_msg'],  # default=LOGGING_FORMATTER,
         help='Set logging formatter for all loggers.'
-             + default(LOGGING_FORMATTER))
+             + default(LOG_FORMAT))
     # =================
     # Uninstall options
     # =================
@@ -270,27 +313,6 @@ Script for monitoring your Mac.
     return parser
 
 
-def uninstall(logging_formatter, clear_all=False):
-    logger.debug(f"Uninstalling {PROJECT_NAME}...")
-    if clear_all:
-        """
-        logger.debug('Removing user config files')
-        remove_file(os.path.join(PROG_DIR, 'config.py'))
-        remove_file(os.path.join(PROG_DIR, 'logging.py'))
-        """
-        logger.debug(f'Remove program directory: {PROG_DIR}')
-        shutil.rmtree(PROG_DIR)
-        logger.debug('Removed!')
-    cmd = f'pip uninstall -y {PROJECT_NAME}'
-    result = subprocess.run(shlex.split(cmd), capture_output=True)
-    return check_result(
-        result,
-        error_msg=f"{PROJECT_NAME} couldn't be uninstalled",
-        valid_msg=f'{PROJECT_NAME} was uninstalled',
-        skip_key='Skipping',
-        logging_formatter=logging_formatter)
-
-
 def main():
     main_cfg = None
     # =====================
@@ -313,7 +335,6 @@ def main():
         # TODO: testing code
         # test = {}
         # print(test['a'])
-        exit_code = 0
         parser = setup_argparser()
         args = parser.parse_args()
         # TODO: can you do it in setup_argparser()
@@ -339,10 +360,13 @@ def main():
         setup_log(package=PACKAGE_NAME, configs_dirpath=configs_dirpath,
                   quiet=main_cfg.quiet,
                   verbose=main_cfg.verbose,
-                  logging_level=main_cfg.logging_level,
-                  logging_formatter=main_cfg.logging_formatter)
+                  log_level=main_cfg.log_level,
+                  log_format=main_cfg.log_format)
         logging_setup = True
         process_returned_values(returned_values)
+        monitor = Monitor(main_cfg, configs_dirpath)
+        exit_code = monitor.run()
+        """
         service = Service(logging_formatter=main_cfg.logging_formatter)
         if main_cfg.uninstall:
             exit_code = uninstall(main_cfg.logging_formatter, main_cfg.clear_all)
@@ -358,9 +382,9 @@ def main():
             exit_code = service.abort()
         else:
             logger.warning(yellow('No action chosen!'))
+        """
     except Exception as e:
         if logging_setup:
-            logging_formatter = main_cfg.logging_formatter
             verbose = main_cfg.verbose
             if verbose:
                 value = e.args
@@ -368,7 +392,7 @@ def main():
                 e.__setattr__('args', value)
                 logger.exception(e)
             else:
-                log_error(e, logging_formatter)
+                log_error(e, main_cfg.log_format)
         else:
             msg = "{}: {}".format(str(e.__class__).split("'")[1], e)
             logger.exception(f'{error(msg)}')
