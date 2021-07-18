@@ -126,7 +126,8 @@ class Service:
 
     def restart(self):
         logger.debug(f"Restarting {self.service_type} '{self.service_name}'...")
-        self.cancel(use_debug=True)
+        if self.cancel(use_debug=True):
+            logger.debug('cancel() returns 1. Maybe the service was already stopped')
         if self.start(use_debug=True):
             log_error(f"The {self.service_type} couldn't be restarted", self.log_format)
             return 1
@@ -301,7 +302,7 @@ Script for monitoring your Mac.
     # ===========
     set_group = parser.add_argument_group(f"{yellow('Set options')}")
     set_group.add_argument(
-        '--set', metavar='option1=value1;option2=value2', dest='set_options',
+        '--set', metavar='option1=value1;option2=value2;...', dest='set_options',
         help='The option names are the long versions, e.g. \'last\' instead of '
              f'\'l\'. Example: {PROG_NAME} --set email:True;delay-action=30')
     return parser
