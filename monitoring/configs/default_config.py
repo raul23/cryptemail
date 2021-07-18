@@ -29,13 +29,21 @@ restart_monitoring = False
 service_type = 'agent'
 
 # 3.2 Report options
-# ========================
-local = False
+# ==================
+show = 10
+start = None
+end = None
 email = False
 encrypt = False
 
 # 3.2 Failed login options
 # ========================
+not_failed = False
 predicate = 'eventMessage contains "Failed to authenticate"'
 action = None
-delay_action = None
+delay_action = 2
+
+# ==============
+# 4. Set options
+# ==============
+set_options = None
