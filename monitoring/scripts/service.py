@@ -103,7 +103,6 @@ def main():
                                   error_number integer NOT NULL,
                                   alert_type text NOT NULL
                               );""".format(TABLE_NAME)
-        timestamps_checked = []
         if len(sys.argv) == number_of_args or True:
             # configs_path = sys.argv[1]
             configs_path = os.path.expanduser('~/mac-monitoring')
@@ -141,25 +140,19 @@ def main():
                         # Check if the timestamp is already in the db
                         if actual_timestamp_exists(conn, TABLE_NAME, groupdict['timestamp']):
                             continue
-                        alert('{} \|\| {} {} {}'.format(detection_timestamp,
-                                                        groupdict['timestamp'],
-                                                        groupdict['message'],
-                                                        groupdict['user']),
-                              use_timestamp=False)
                         values = (groupdict['timestamp'], detection_timestamp,
                                   groupdict['process'], groupdict['PID'],
                                   groupdict['message'], groupdict['user'],
                                   groupdict['error_number'], 'failed_login')
                         insert_log(conn, TABLE_NAME, values)
-                        # NOTE: groupdict.values() in 2.7 not in order (timestamp first and so on)
-                        """
-                        if groupdict['timestamp'] in timestamps_checked:
-                            continue
-                        timestamps_checked.append(groupdict['timestamp'])
-                        alert('\|\| {} {} {}'.format(groupdict['timestamp'],
-                                                     groupdict['message'],
-                                                     groupdict['user']))
-                        """
+                        alert_msg1 = '{} \|\| {} {} {}'.format(detection_timestamp,
+                                                               groupdict['timestamp'],
+                                                               groupdict['message'],
+                                                               groupdict['user'])
+                        alert(alert_msg1, use_timestamp=False)
+                        alert_msg2 = '{} {} {}'.format(groupdict['timestamp'], groupdict['message'], groupdict['user'])
+                        os.system('osascript -e \'display notification "{}" with title "Alert"\''.format(alert_msg2))
+                        # NOTE: groupdict.values() in 2.7 not in order (timestamp not first)
                 else:
                     log('Nothing to report!', 'debug')
                 log('Sleeping for {} seconds'.format(sleeping))
