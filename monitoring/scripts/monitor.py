@@ -54,7 +54,7 @@ class Monitor:
             result,
             error_msg=f"{PROJECT_NAME} couldn't be uninstalled",
             valid_msg=f'{PROJECT_NAME} was uninstalled',
-            skip_key='Skipping',
+            skip_keys=['Skipping'],
             log_format=self.config.log_format)
 
     def run(self):
