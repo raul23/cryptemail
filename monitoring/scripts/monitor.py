@@ -100,14 +100,16 @@ class Service:
         self.service_type = service_type
         if service_type == 'agent':
             self.service_name = f'{SERVICE_NAME}.agent'
+            self.plist_path = os.path.expanduser(
+                f'~/Library/LaunchAgents/{self.service_name}.plist')
         else:
             self.service_name = f'{SERVICE_NAME}.daemon'
+            self.plist_path = os.path.expanduser(
+                f'/Library/LaunchDaemons/{self.service_name}.plist')
             raise NotImplementedError(
                 f"Service type '{service_type}' not supported. Only 'agent' "
                 "is supported as a service")
         self.log_format = log_format
-        self.plist_path = os.path.expanduser(
-            f'~/Library/LaunchAgents/{self.service_name}.plist')
         self.script_path = SERVICE_SCRIPT_PATH
         self.checker = CheckResult(log_format)
 
