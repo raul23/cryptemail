@@ -51,10 +51,8 @@ class Monitor:
             exit_code = reset_file(self.config.reset, self.configs_path)
         elif self.config.start_monitoring:
             exit_code = self.service.start()
-        elif self.config.pause_monitoring:
-            exit_code = self.service.pause()
-        elif self.config.abort_monitoring:
-            exit_code = self.service.abort()
+        elif self.config.cancel_monitoring:
+            exit_code = self.service.cancel()
         else:
             logger.warning(yellow('No action chosen!'))
         return exit_code
@@ -75,17 +73,14 @@ class Service:
             f'~/Library/LaunchAgents/{self.service_name}.plist')
         self.script_path = SERVICE_SCRIPT_PATH
 
-    def abort(self):
-        raise NotImplementedError('abort() is not implemented!')
-
-    def pause(self):
-        logger.debug(f"Pausing {self.service_type} '{self.service_name}'...")
+    def cancel(self):
+        logger.debug(f"Stopping {self.service_type} '{self.service_name}'...")
         cmd = f'launchctl unload {self.plist_path}'
         result = subprocess.run(shlex.split(cmd), capture_output=True)
         return check_result(
             result,
-            error_msg=f"The {self.service_type} couldn't be paused",
-            valid_msg=f'{self.service_type} paused',
+            error_msg=f"The {self.service_type} couldn't be stopped",
+            valid_msg=f'{self.service_type} stopped',
             err_keys=['not find', 'No such file or directory'],
             log_format=self.log_format)
 
@@ -170,17 +165,6 @@ Script for monitoring your Mac.
         '--verbose', action='store_true',
         help='Print various debugging information, e.g. print traceback '
              'when there is an exception.')
-    # TODO: important, remove the following option
-    """
-    general_group.add_argument(
-        '-u', '--use-config', dest='use_config', action='store_true',
-        help='If this is enabled, the parameters found in the main '
-             'config file will be used instead of the command-line '
-             'arguments. NOTE: any other command-line argument that '
-             'you use in the terminal with the `--use-config` flag is '
-             'ignored, i.e. only the parameters defined in the main '
-             'config file config.py will be used.')
-    """
     general_group.add_argument(
         '-l', '--log-level', dest='log_level',
         choices=['debug', 'info', 'warning', 'error'],  # default=LOGGING_LEVEL,
@@ -208,12 +192,12 @@ Script for monitoring your Mac.
         f"{yellow('Edit/reset a configuration file')}")
     parser_edit_mutual_group = edit_group.add_mutually_exclusive_group()
     parser_edit_mutual_group.add_argument(
-        "-e", "--edit", choices=[LOG_CFG, MAIN_CFG],
+        '-e', '--edit', choices=[LOG_CFG, MAIN_CFG],
         help='Edit a configuration file, either the main configuration file '
              f'(`{MAIN_CFG}`) or the logging configuration file (`{LOG_CFG}`).'
              + default(default_cfg.edit))
     edit_group.add_argument(
-        "--app", dest="app",  # default=None,
+        '-a', '--app', dest='app',
         help='''Name of the application to use for editing the file. If no 
             name is given, then the default application for opening this type of
             file will be used.''' + default(default_cfg.app))
@@ -228,17 +212,14 @@ Script for monitoring your Mac.
     monitor_group = parser.add_argument_group(f"{yellow('Monitoring options')}")
     parser_mutual_group = monitor_group.add_mutually_exclusive_group()
     parser_mutual_group.add_argument(
-        '-a', '--abort-monitoring', action="store_true",
-        help='Abort system monitoring.')
-    parser_mutual_group.add_argument(
-        '-p', '--pause-monitoring', action="store_true",
-        help='Pause system monitoring.')
-    parser_mutual_group.add_argument(
         '-s', '--start-monitoring', action="store_true",
         help='Start system monitoring.')
     parser_mutual_group.add_argument(
         '-r', '--restart-monitoring', action="store_true",
         help='Restart system monitoring.')
+    parser_mutual_group.add_argument(
+        '-c', '--cancel-monitoring', action="store_true",
+        help='Cancel system monitoring.')
     monitor_group.add_argument(
         '-t', '--service-type', choices=['agent', 'daemon'],
         help='Type of service to install.' + default(default_cfg.service_type))
@@ -247,11 +228,14 @@ Script for monitoring your Mac.
     # ==============
     report_group = parser.add_argument_group(f"{yellow('Report options')}")
     report_group.add_argument(
-        '--show', metavar='NUM', help=f'Show last {default_cfg.show} logs.' + default(default_cfg.show))
+        '--show', metavar='NUM',
+        help=f'Show last {default_cfg.show} logs.' + default(default_cfg.show))
     report_group.add_argument(
-        '--start', metavar='YYYY-MM-DD HH:MM:SS', help='TODO.' + default(default_cfg.start))
+        '--start-date', metavar='YYYY-MM-DD HH:MM:SS',
+        help='TODO.' + default(default_cfg.start_date))
     report_group.add_argument(
-        '--end', metavar='YYYY-MM-DD HH:MM:SS', help='TODO.' + default(default_cfg.end))
+        '--end-date', metavar='YYYY-MM-DD HH:MM:SS',
+        help='TODO.' + default(default_cfg.end_date))
     report_group.add_argument(
         '--email', action="store_true", help='Send the alerts as emails.')
     report_group.add_argument(
@@ -348,23 +332,6 @@ def main():
         process_returned_values(returned_values)
         monitor = Monitor(main_cfg, configs_dirpath)
         exit_code = monitor.run()
-        """
-        service = Service(logging_formatter=main_cfg.logging_formatter)
-        if main_cfg.uninstall:
-            exit_code = uninstall(main_cfg.logging_formatter, main_cfg.clear_all)
-        elif main_cfg.edit:
-            exit_code = edit_file(main_cfg.edit, main_cfg.app, configs_dirpath)
-        elif main_cfg.reset:
-            exit_code = reset_file(main_cfg.reset, configs_dirpath)
-        elif main_cfg.start_monitoring:
-            exit_code = service.start()
-        elif main_cfg.pause_monitoring:
-            exit_code = service.pause()
-        elif main_cfg.abort_monitoring:
-            exit_code = service.abort()
-        else:
-            logger.warning(yellow('No action chosen!'))
-        """
     except Exception as e:
         if logging_setup:
             verbose = main_cfg.verbose
