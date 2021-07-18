@@ -20,11 +20,47 @@ SERVICE_SCRIPT_NAME = 'service.py'
 SERVICE_SCRIPT_PATH = os.path.join(PROG_DIR, SERVICE_SCRIPT_NAME)
 
 
+class CheckResult:
+    def __init__(self, log_format):
+        self.log_format = log_format
+
+    def _log_msg(self, msg, log_level, use_debug):
+        if not use_debug:
+            if log_level == 'warning':
+                logger.warning(msg)
+            elif log_level == 'error':
+                log_error(msg, self.log_format)
+            else:
+                logger.info(msg)
+        else:
+            logger.debug(msg)
+
+    def check_result(self, result, error_msg, valid_msg, error_keys=None,
+                     skip_keys=None, use_debug=False):
+        def find_key(msg, keys):
+            for key in keys:
+                if msg.find(key) != -1:
+                    return True
+            return False
+        # TODO: raise error to get traceback?
+        stderr = result.stderr.decode().strip()
+        stderr = stderr.replace('WARNING:', '').replace('ERROR:', '').strip()
+        if skip_keys and stderr and find_key(stderr, skip_keys):
+            self._log_msg(f'{warning()} {stderr}', 'warning', use_debug)
+        elif result.returncode or (error_keys and find_key(stderr, error_keys)):
+            self._log_msg(f'{error_msg}: {stderr}', 'error', use_debug)
+            return 1
+        else:
+            self._log_msg(green(valid_msg), 'info', use_debug)
+        return 0
+
+
 class Monitor:
     def __init__(self, config, configs_path):
         self.config = config
         self.configs_path = configs_path
         self.service = Service(log_format=self.config.log_format)
+        self.checker = CheckResult(self.config.log_format)
 
     def _uninstall(self):
         logger.debug(f"Uninstalling {PROJECT_NAME}...")
@@ -34,12 +70,11 @@ class Monitor:
             logger.debug('Removed!')
         cmd = f'pip uninstall -y {PROJECT_NAME}'
         result = subprocess.run(shlex.split(cmd), capture_output=True)
-        return check_result(
+        return self.checker.check_result(
             result,
             error_msg=f"{PROJECT_NAME} couldn't be uninstalled",
             valid_msg=f'{PROJECT_NAME} was uninstalled',
-            skip_keys=['Skipping'],
-            log_format=self.config.log_format)
+            skip_keys=['Skipping'])
 
     def run(self):
         exit_code = 0
@@ -53,8 +88,10 @@ class Monitor:
             exit_code = self.service.start()
         elif self.config.cancel_monitoring:
             exit_code = self.service.cancel()
+        elif self.config.restart_monitoring:
+            exit_code = self.service.restart()
         else:
-            logger.warning(yellow('No action chosen!'))
+            logger.debug(yellow('No action chosen'))
         return exit_code
 
 
@@ -72,19 +109,29 @@ class Service:
         self.plist_path = os.path.expanduser(
             f'~/Library/LaunchAgents/{self.service_name}.plist')
         self.script_path = SERVICE_SCRIPT_PATH
+        self.checker = CheckResult(log_format)
 
-    def cancel(self):
+    def cancel(self, use_debug=False):
         logger.debug(f"Stopping {self.service_type} '{self.service_name}'...")
         cmd = f'launchctl unload {self.plist_path}'
         result = subprocess.run(shlex.split(cmd), capture_output=True)
-        return check_result(
+        return self.checker.check_result(
             result,
             error_msg=f"The {self.service_type} couldn't be stopped",
             valid_msg=f'{self.service_type} stopped',
-            err_keys=['not find', 'No such file or directory'],
-            log_format=self.log_format)
+            error_keys=['not find', 'No such file or directory'],
+            use_debug=use_debug)
 
-    def start(self):
+    def restart(self):
+        logger.debug(f"Restarting {self.service_type} '{self.service_name}'...")
+        self.cancel(use_debug=True)
+        if self.start(use_debug=True):
+            log_error(f"The {self.service_type} couldn't be restarted", self.log_format)
+            return 1
+        logger.info(green(f'{self.service_type} restarted'))
+        return 0
+
+    def start(self, use_debug=False):
         logger.debug(f"Starting {self.service_type} '{self.service_name}'...")
         src = os.path.join(os.path.dirname(scripts.__file__), SERVICE_SCRIPT_NAME)
         copy(src, self.script_path)
@@ -100,38 +147,17 @@ class Service:
         # launchctl list
         cmd = f'launchctl load {self.plist_path}'
         result = subprocess.run(shlex.split(cmd), capture_output=True)
-        return check_result(
+        return self.checker.check_result(
             result,
             error_msg=f"The {self.service_type} couldn't be started",
             valid_msg=f'{self.service_type} started',
-            skip_keys=['already loaded'], log_format=self.log_format)
-
-
-def check_result(result, error_msg, valid_msg, err_keys=None, skip_keys=None,
-                 log_format='simple'):
-    def find_key(msg, keys):
-        for key in keys:
-            if msg.find(key) != -1:
-                return True
-        return False
-    # TODO: raise error to get traceback?
-    stderr = result.stderr.decode().strip()
-    stderr = stderr.replace('WARNING:', '').replace('ERROR:', '').strip()
-    if skip_keys and stderr and find_key(stderr, skip_keys):
-        logger.warning(f'{warning()} {stderr}')
-    elif result.returncode or (err_keys and find_key(stderr, err_keys)):
-        log_error(f'{error_msg}: {stderr}', log_format)
-        return 1
-    else:
-        logger.info(green(valid_msg))
-        return 0
+            skip_keys=['already loaded'],
+            use_debug=use_debug)
 
 
 def log_error(msg, log_format='simple'):
-    if log_format == 'only_msg':
-        logger.error(f'{error(msg)}')
-    else:
-        logger.error(f'{red(msg)}')
+    msg = f'{error(msg)}' if log_format == 'only_msg' else f'{red(msg)}'
+    logger.error(msg)
 
 
 def setup_argparser():
