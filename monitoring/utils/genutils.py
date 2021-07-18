@@ -491,8 +491,12 @@ contained therein. The user is solely responsible for any action he/she takes wi
 code and information contained in it.'''
 
 
+def prog_name(filename):
+    return filename.split('.py')[0]
+
+
 def usage(script_filename):
-    msg = f"{script_filename.split('.py')[0]} [OPTIONS]"
+    msg = f"{prog_name(script_filename)} [OPTIONS]"
     return f"{color(msg, 'b')}"
 
 
