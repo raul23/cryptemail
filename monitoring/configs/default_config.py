@@ -9,8 +9,8 @@ verbose = False
 
 # 1.2 Miscellaneous options
 # =========================
-logging_level = 'info'
-logging_formatter = 'only_msg'
+log_level = 'info'
+log_format = 'only_msg'
 
 # ===============
 # 2. Edit options
