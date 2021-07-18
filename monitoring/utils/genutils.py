@@ -415,7 +415,7 @@ def run_cmd(cmd):
 
 
 def setup_log(package=None, configs_dirpath=None, quiet=False, verbose=False,
-              logging_level=None, logging_formatter=None, subcommand=None):
+              log_level=None, log_format=None, subcommand=None):
     package_path = os.getcwd()
     log_filepath = get_logging_filepath(configs_dirpath)
     main_cfg_msg = f"Main config path: {get_main_config_filepath(configs_dirpath)}"
@@ -426,15 +426,15 @@ def setup_log(package=None, configs_dirpath=None, quiet=False, verbose=False,
     # TODO: get first cfg_dict to setup log (same in train_models.py)
     if not quiet:
         if verbose:
-            # verbose supercedes logging_level
+            # verbose supercedes log_level
             set_logging_level(log_dict, level='DEBUG')
         else:
-            if logging_level:
-                logging_level = logging_level.upper()
+            if log_level:
+                log_level = log_level.upper()
                 # TODO: add console_for_users at the top
-                set_logging_level(log_dict, level=logging_level)
-        if logging_formatter:
-            set_logging_formatter(log_dict, formatter=logging_formatter)
+                set_logging_level(log_dict, level=log_level)
+        if log_format:
+            set_logging_formatter(log_dict, formatter=log_format)
         if subcommand:
             # TODO: scripts.monitor and monitoring (package name) at the top?
             size_longest_name = len('scripts.monitor')
