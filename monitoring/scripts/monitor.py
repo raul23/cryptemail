@@ -121,8 +121,6 @@ class Service:
         # launchctl list
         cmd = f'launchctl load {self.plist_path}'
         result = subprocess.run(shlex.split(cmd), capture_output=True)
-        import ipdb
-        ipdb.set_trace()
         return check_result(
             result,
             error_msg=f"The {self.service_type} couldn't be started",
