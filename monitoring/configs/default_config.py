@@ -22,7 +22,7 @@ reset = None
 # =====================
 # 3. Monitoring options
 # =====================
-abort_monitoring = False
+cancel_monitoring = False
 pause_monitoring = False
 start_monitoring = False
 restart_monitoring = False
@@ -31,8 +31,8 @@ service_type = 'agent'
 # 3.2 Report options
 # ==================
 show = 10
-start = None
-end = None
+start_date = None
+end_date = None
 email = False
 encrypt = False
 
