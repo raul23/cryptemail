@@ -17,12 +17,24 @@ LOGS_PATH = os.path.expanduser('~/logs.txt')
 # ========
 DB_NAME = 'report.db'
 TABLE_NAME = 'alerts'
+SQL_CREATE_TABLE = '''
+CREATE TABLE IF NOT EXISTS {} (
+    actual_timestamp text PRIMARY KEY NOT NULL,
+    detection_timestamp text NOT NULL,
+    process text NOT NULL,
+    PID integer NOT NULL,
+    message text NOT NULL,
+    username text NOT NULL,
+    error_number integer NOT NULL,
+    alert_type text NOT NULL
+);'''.format(TABLE_NAME)
 
 
 def actual_timestamp_exists(conn, table_name, actual_timestamp):
     c = conn.cursor()
     # TODO: check table_name exist
-    sql = "SELECT count(actual_timestamp) FROM {} WHERE actual_timestamp=?".format(table_name)
+    sql = "SELECT count(actual_timestamp) FROM {} WHERE " \
+          "actual_timestamp=?".format(table_name)
     c.execute(sql, (actual_timestamp,))
     result = c.fetchone()
     if result[0] == 1:
@@ -78,7 +90,7 @@ def table_exists(conn, table_name):
 def insert_log(conn, table_name, values):
     c = conn.cursor()
     sql = '''INSERT INTO {} (actual_timestamp, detection_timestamp, process, 
-    PID, message, user, error_number, alert_type) VALUES 
+    PID, message, username, error_number, alert_type) VALUES 
     (?, ?, ?, ?, ?, ?, ?, ?)'''.format(table_name)
     c.execute(sql, values)
     return c.lastrowid
@@ -86,23 +98,15 @@ def insert_log(conn, table_name, values):
 
 def main():
     exit_code = 0
+    conn = None
     try:
         log('Starting!')
         last = '1m'
         number_of_args = 2
-        regex = r"(?P<timestamp>^\d[\d\-\s:\.]+)  (?P<process>\w+ \w+)(?P<PID>\[\d+\]): " \
-                r"(?P<message>.+) <(?P<user>.+)> (?P<error_number>.+)"
+        regex = r"(?P<timestamp>^\d[\d\-\s:\.]+)  " \
+                r"(?P<process>\w+ \w+)(?P<PID>\[\d+\]): " \
+                r"(?P<message>.+) <(?P<username>.+)> (?P<error_number>.+)"
         sleeping = 2
-        sql_create_table = """CREATE TABLE IF NOT EXISTS {} (
-                                  actual_timestamp text PRIMARY KEY NOT NULL,
-                                  detection_timestamp text NOT NULL,
-                                  process text NOT NULL,
-                                  PID integer NOT NULL,
-                                  message text NOT NULL,
-                                  user text NOT NULL,
-                                  error_number integer NOT NULL,
-                                  alert_type text NOT NULL
-                              );""".format(TABLE_NAME)
         if len(sys.argv) == number_of_args or True:
             # configs_path = sys.argv[1]
             configs_path = os.path.expanduser('~/mac-monitoring')
@@ -116,7 +120,7 @@ def main():
                 log("Table '{}' already exists".format(TABLE_NAME), 'debug')
             else:
                 log("Creating the table '{}'".format(TABLE_NAME))
-                create_table(conn, sql_create_table)
+                create_table(conn, SQL_CREATE_TABLE)
             while True:
                 log('Executing log command', 'debug')
                 cmd = "log show --last {} --style syslog --predicate \'{}\'".format(
@@ -138,20 +142,24 @@ def main():
                     for matchNum, match in enumerate(matches, start=1):
                         groupdict = match.groupdict()
                         # Check if the timestamp is already in the db
-                        if actual_timestamp_exists(conn, TABLE_NAME, groupdict['timestamp']):
+                        if actual_timestamp_exists(conn, TABLE_NAME,
+                                                   groupdict['timestamp']):
                             continue
                         values = (groupdict['timestamp'], detection_timestamp,
                                   groupdict['process'], groupdict['PID'],
-                                  groupdict['message'], groupdict['user'],
+                                  groupdict['message'], groupdict['username'],
                                   groupdict['error_number'], 'failed_login')
                         insert_log(conn, TABLE_NAME, values)
                         alert_msg1 = '{} \|\| {} {} {}'.format(detection_timestamp,
                                                                groupdict['timestamp'],
                                                                groupdict['message'],
-                                                               groupdict['user'])
+                                                               groupdict['username'])
                         alert(alert_msg1, use_timestamp=False)
-                        alert_msg2 = '{} {} {}'.format(groupdict['timestamp'], groupdict['message'], groupdict['user'])
-                        os.system('osascript -e \'display notification "{}" with title "Alert"\''.format(alert_msg2))
+                        alert_msg2 = '{} {} {}'.format(groupdict['timestamp'],
+                                                       groupdict['message'],
+                                                       groupdict['username'])
+                        os.system('osascript -e \'display notification "{}" '
+                                  'with title "Alert"\''.format(alert_msg2))
                         # NOTE: groupdict.values() in 2.7 not in order (timestamp not first)
                 else:
                     log('Nothing to report!', 'debug')
@@ -172,6 +180,9 @@ def main():
         else:
             log('{}'.format(e), 'error')
         exit_code = 1
+    # TODO: in a finally?
+    if conn:
+        conn.close()
     return exit_code
 
 
