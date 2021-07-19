@@ -1,3 +1,4 @@
+import sqlite3
 import tempfile
 
 from monitoring import __name__ as PACKAGE_NAME, __version__ as VERSION
@@ -28,7 +29,7 @@ class CheckResult:
     def _log_msg(self, msg, log_level, use_debug):
         if not use_debug:
             if log_level == 'warning':
-                logger.warning(msg)
+                log_warning(msg, self.log_format)
             elif log_level == 'error':
                 log_error(msg, self.log_format)
             else:
@@ -47,7 +48,7 @@ class CheckResult:
         stderr = result.stderr.decode().strip()
         stderr = stderr.replace('WARNING:', '').replace('ERROR:', '').strip()
         if skip_keys and stderr and find_key(stderr, skip_keys):
-            self._log_msg(f'{warning()} {stderr}', 'warning', use_debug)
+            self._log_msg(f'{stderr}', 'warning', use_debug)
         elif result.returncode or (error_keys and find_key(stderr, error_keys)):
             self._log_msg(f'{error_msg}: {stderr}', 'error', use_debug)
             return 1
@@ -63,28 +64,81 @@ class Monitor:
         self.service = Service(config.service_type, config.log_format)
         self.checker = CheckResult(config.log_format)
 
-    def _show(self):
-        logger.debug(f"Showing logs...")
-        # Connect to database
-        db_path = os.path.join(PROG_DIR, DB_NAME)
-        conn = connect_db(db_path)
+    @staticmethod
+    def _close_conn(conn):
+        if conn:
+            conn.close()
+
+    @staticmethod
+    def _print_logs_table(result):
+        # TODO: install package for showing tabulated data?
+        headers = ['timestamp', 'alert', 'user']
+        # TODO: important, hardcoded width columns
+        header_format = '{:^33}{:^15}{:^12}'
+        logs = '\n' + header_format.format(*headers) + '\n'
+        row_format = '{:<33}{:<15}{:^10}'
+        for alert in result:
+            log = [alert[0] + ' | ', alert[3] + ' | ', alert[2]]
+            logs += row_format.format(*log) + '\n'
+        logger.info(logs)
+
+    def _show_between_logs(self, conn):
+        logger.debug(f"Showing logs between {'?'} and {'?'}")
+        c = conn.cursor()
+        # TODO: check table_name exist
+        sql = "SELECT MAX(actual_timestamp), MIN(actual_timestamp) FROM " \
+              "{}".format(TABLE_NAME)
+        c.execute(sql)
+        max_date, min_date = c.fetchone()
+        if max_date is None and min_date is None:
+            log_warning('The logs database is empty!', self.config.log_format)
+        else:
+            if self.config.end_date:
+                self.config.end_date += '.999999'
+                end_date = self.config.end_date
+            else:
+                end_date = max_date
+            if self.config.start_date:
+                self.config.start_date += '.000000'
+                start_date = self.config.start_date
+            else:
+                start_date = min_date
+            sql = "SELECT actual_timestamp, message, user, alert_type FROM {} " \
+                  "WHERE actual_timestamp BETWEEN ? and ? ORDER BY " \
+                  "actual_timestamp DESC".format(TABLE_NAME)
+            c.execute(sql, (start_date, end_date,))
+            result = c.fetchall()
+            self._print_logs_table(result)
+        return 0
+
+    def _show_n_logs(self, conn):
+        logger.debug(f'Showing {self.config.num_logs} last logs')
         c = conn.cursor()
         # TODO: check table_name exist
         sql = "SELECT actual_timestamp, message, user, alert_type FROM {} " \
               "ORDER BY actual_timestamp DESC LIMIT ?".format(TABLE_NAME)
         c.execute(sql, (self.config.num_logs,))
         result = c.fetchall()
-        conn.close()
-        headers = ['timestamp', 'alert', 'user']
-        # TODO: important, hardcoded width columns
-        header_format = '{:^33}{:^15}{:^12}'
-        logs = header_format.format(*headers) + '\n'
-        row_format = '{:<33}{:<15}{:^10}'
-        for alert in result:
-            log = [alert[0] + ' | ', alert[3] + ' | ', alert[2]]
-            logs += row_format.format(*log) + '\n'
-        print(logs)
+        self._print_logs_table(result)
         return 0
+
+    def _show(self):
+        logger.debug(f"Showing logs...")
+        conn = None
+        try:
+            # Connect to database
+            db_path = os.path.join(PROG_DIR, DB_NAME)
+            conn = connect_db(db_path)
+            if self.config.start_date or self.config.end_date:
+                exit_code = self._show_between_logs(conn)
+            else:
+                exit_code = self._show_n_logs(conn)
+        except sqlite3.Error as e:
+            raise e
+        else:
+            return exit_code
+        finally:
+            self._close_conn(conn)
 
     def _uninstall(self):
         logger.debug(f"Uninstalling {PROJECT_NAME}...")
@@ -186,9 +240,14 @@ class Service:
             use_debug=use_debug)
 
 
-def log_error(msg, log_format='simple'):
+def log_error(msg, log_format):
     msg = f'{error(msg)}' if log_format == 'only_msg' else f'{red(msg)}'
     logger.error(msg)
+
+
+def log_warning(msg, log_format):
+    msg = f'{warning(msg)}' if log_format == 'only_msg' else f'{yellow(msg)}'
+    logger.warning(msg)
 
 
 def setup_argparser():
@@ -291,6 +350,7 @@ Script for monitoring your Mac.
         '--num-logs', metavar='NUM', type=int,
         help=f'The last {default_cfg.num_logs} logs will be shown.'
              + default(default_cfg.num_logs))
+    # TODO: important, validate dates with regex
     report_group.add_argument(
         '--start-date', metavar='YYYY-MM-DD HH:MM:SS',
         help='TODO.' + default(default_cfg.start_date))
@@ -412,4 +472,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
