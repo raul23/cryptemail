@@ -1,9 +1,10 @@
 import tempfile
 
 from monitoring import __name__ as PACKAGE_NAME, __version__ as VERSION
+from monitoring import scripts
 from monitoring.configs import default_config as default_cfg, plist
 from monitoring.edit import edit_file, reset_file
-from monitoring import scripts
+from monitoring.scripts.service import connect_db, DB_NAME, TABLE_NAME
 from monitoring.utils.genutils import *
 from monitoring.utils.logutils import init_log
 
@@ -59,8 +60,31 @@ class Monitor:
     def __init__(self, config, configs_path):
         self.config = config
         self.configs_path = configs_path
-        self.service = Service(log_format=self.config.log_format)
-        self.checker = CheckResult(self.config.log_format)
+        self.service = Service(config.service_type, config.log_format)
+        self.checker = CheckResult(config.log_format)
+
+    def _show(self):
+        logger.debug(f"Showing logs...")
+        # Connect to database
+        db_path = os.path.join(PROG_DIR, DB_NAME)
+        conn = connect_db(db_path)
+        c = conn.cursor()
+        # TODO: check table_name exist
+        sql = "SELECT actual_timestamp, message, user, alert_type FROM {} " \
+              "ORDER BY actual_timestamp DESC LIMIT ?".format(TABLE_NAME)
+        c.execute(sql, (self.config.num_logs,))
+        result = c.fetchall()
+        conn.close()
+        headers = ['timestamp', 'alert', 'user']
+        # TODO: important, hardcoded width columns
+        header_format = '{:^33}{:^15}{:^12}'
+        logs = header_format.format(*headers) + '\n'
+        row_format = '{:<33}{:<15}{:^10}'
+        for alert in result:
+            log = [alert[0] + ' | ', alert[3] + ' | ', alert[2]]
+            logs += row_format.format(*log) + '\n'
+        print(logs)
+        return 0
 
     def _uninstall(self):
         logger.debug(f"Uninstalling {PROJECT_NAME}...")
@@ -78,7 +102,9 @@ class Monitor:
 
     def run(self):
         exit_code = 0
-        if self.config.uninstall:
+        if self.config.show:
+            exit_code = self._show()
+        elif self.config.uninstall:
             exit_code = self._uninstall()
         elif self.config.edit:
             exit_code = edit_file(self.config.edit, self.config.app, self.configs_path)
@@ -129,7 +155,8 @@ class Service:
         if self.cancel(use_debug=True):
             logger.debug('cancel() returns 1. Maybe the service was already stopped')
         if self.start(use_debug=True):
-            log_error(f"The {self.service_type} couldn't be restarted", self.log_format)
+            log_error(f"The {self.service_type} couldn't be restarted",
+                      self.log_format)
             return 1
         logger.info(green(f'{self.service_type} restarted'))
         return 0
@@ -146,7 +173,8 @@ class Service:
             f.write(plist_content)
         copy(tmp_file_plist, self.plist_path)
         remove_file(tmp_file_plist)
-        # TODO: important, check first if service is already loaded before overwriting service.py and plist
+        # TODO: important, check first if service is already loaded before
+        # overwriting service.py and plist
         # launchctl list
         cmd = f'launchctl load {self.plist_path}'
         result = subprocess.run(shlex.split(cmd), capture_output=True)
@@ -257,8 +285,12 @@ Script for monitoring your Mac.
     # ==============
     report_group = parser.add_argument_group(f"{yellow('Report options')}")
     report_group.add_argument(
-        '--show', metavar='NUM',
-        help=f'Show last {default_cfg.show} logs.' + default(default_cfg.show))
+        '--show', action="store_true",
+        help=f'Show logs of alerts (e.g. failed login attempts).')
+    report_group.add_argument(
+        '--num-logs', metavar='NUM', type=int,
+        help=f'The last {default_cfg.num_logs} logs will be shown.'
+             + default(default_cfg.num_logs))
     report_group.add_argument(
         '--start-date', metavar='YYYY-MM-DD HH:MM:SS',
         help='TODO.' + default(default_cfg.start_date))
@@ -268,7 +300,8 @@ Script for monitoring your Mac.
     report_group.add_argument(
         '--email', action="store_true", help='Send the alerts as emails.')
     report_group.add_argument(
-        '--encrypt', action="store_true", help='Encrypt emails before being sent.')
+        '--encrypt', action="store_true",
+        help='Encrypt emails before sending them.')
     # ====================
     # Failed login options
     # ====================
@@ -373,7 +406,7 @@ def main():
                 log_error(e, main_cfg.log_format)
         else:
             msg = "{}: {}".format(str(e.__class__).split("'")[1], e)
-            logger.exception(f'{error(msg)}')
+            logger.exception(f"{red('ERROR')}    {msg}")
         exit_code = 1
     return exit_code
 
