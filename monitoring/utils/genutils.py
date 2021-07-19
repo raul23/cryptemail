@@ -475,7 +475,7 @@ def color(msg, msg_color='y', bold=False):
 
 
 def error(msg):
-    return f"{red('ERROR')} {msg}"
+    return f"ERROR    {red(msg)}"
 
 
 def default(default_value):
