@@ -362,6 +362,10 @@ def process_returned_values(returned_values):
         log_opts_overridden(returned_values.args_not_found_in_config, msg)
 
 
+def prog_name(filename):
+    return filename.split('.py')[0]
+
+
 def remove_file(file_path):
     # TODO add reference: https://stackoverflow.com/a/42641792
     try:
@@ -475,7 +479,11 @@ def color(msg, msg_color='y', bold=False):
 
 
 def error(msg):
-    return f"ERROR    {red(msg)}"
+    return f"ERROR {red(msg)}"
+
+
+def warning(msg):
+    return f"WARNING {yellow(msg)}"
 
 
 def default(default_value):
@@ -491,17 +499,9 @@ contained therein. The user is solely responsible for any action he/she takes wi
 code and information contained in it.'''
 
 
-def prog_name(filename):
-    return filename.split('.py')[0]
-
-
 def usage(script_filename):
     msg = f"{prog_name(script_filename)} [OPTIONS]"
     return f"{color(msg, 'b')}"
-
-
-def warning():
-    return f"{color('WARNING', 'y')}"
 
 
 def blue(msg):
