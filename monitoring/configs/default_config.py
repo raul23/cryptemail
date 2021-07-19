@@ -30,7 +30,8 @@ service_type = 'agent'
 
 # 3.2 Report options
 # ==================
-show = 10
+show = False
+num_logs = 10
 start_date = None
 end_date = None
 email = False
