@@ -33,7 +33,7 @@ locally and/or send them through encrypted emails to a specified email account.
 Python dependencies
 ===================
 - **Platform:** macOS
-- **Python:**  3.7+
+- **Python:**  3.7
 
 Install package
 ===============
