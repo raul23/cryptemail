@@ -8,7 +8,7 @@ mac-monitoring
     <br> 🚧 &nbsp;&nbsp;&nbsp;<b>Work-In-Progress</b>
   </p>
   
-The main objective is to build a monitoring program for Mac that will check for
+The main objective is to build a monitoring program for macOS that will check for
 anomalies in your system (e.g. failed login attempts) and alert you of any 
 suspicious activities within your system. It will be able to save the reports 
 locally and/or send them through encrypted emails to a specified email account.
