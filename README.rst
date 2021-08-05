@@ -63,3 +63,6 @@ If you want to also remove all config files and reports, use also the ``--all`` 
 
 **NOTE:** the ``--all`` flag will also remove the whole ``~/mac-monitoring`` directory along 
 with all files in it (e.g. config files)
+
+Testing options
+===============
