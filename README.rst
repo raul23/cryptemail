@@ -13,8 +13,6 @@ anomalies in your system (e.g. failed login attempts) and alert you of any
 suspicious activities within your system. It will be able to save the reports 
 locally and/or send them through encrypted emails.
 
-Test
-
 `:warning:`
 
   **Disclaimer**
