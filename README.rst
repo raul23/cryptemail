@@ -22,38 +22,19 @@ Python dependencies
 
 Install package
 ===============
-To install the ``monitoring`` package:
+To install the ``crypto_email`` package:
 
 .. code-block:: bash
 
-   pip install git+https://github.com/raul23/mac-monitoring#egg=mac-monitoring
+   pip install git+https://github.com/raul23/crypto-email#egg=crypto-email
 
 Uninstall package
 =================
-To uninstall only the ``monitoring`` package:
+To uninstall only the ``crypto_email`` package:
 
 .. code-block:: bash
  
-   monitor -u
-   
-**NOTE:** the config files and reports will still be left in the ``~/mac-monitoring`` directory
-
-|
-
-If you want to also remove all config files and reports, use also the ``--all`` flag:
-
-.. code-block:: bash
- 
-   monitor -u --all
-
-**NOTE:** the ``--all`` flag will also remove the whole ``~/mac-monitoring`` directory along 
-with all files in it (e.g. config files)
+   crypto_email -u
 
 Scripts
 =======
-``serviced.py``
----------------
-description
-"""""""""""
-options
-"""""""
