@@ -1,6 +1,6 @@
-============
-crypto-email
-============
+===========
+cryptoemail
+===========
 
 .. raw:: html
 
@@ -22,7 +22,7 @@ Python dependencies
 
 Install package
 ===============
-To install the ``crypto_email`` package:
+To install the ``cryptoemail`` package:
 
 .. code-block:: bash
 
@@ -30,11 +30,11 @@ To install the ``crypto_email`` package:
 
 Uninstall package
 =================
-To uninstall only the ``crypto_email`` package:
+To uninstall only the ``cryptoemail`` package:
 
 .. code-block:: bash
  
-   crypto_email -u
+   cryptoemail -u
 
 Scripts
 =======
