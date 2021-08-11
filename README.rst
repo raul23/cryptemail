@@ -8,7 +8,7 @@ crypto-email
     <br> 🚧 &nbsp;&nbsp;&nbsp;<b>Work-In-Progress</b>
   </p>
   
-Send and receive encrypted emails.
+Command-line program for sending and receiving encrypted emails.
 
 .. contents:: **Contents**
    :depth: 3
