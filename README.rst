@@ -1,6 +1,6 @@
-==============
-mac-monitoring
-==============
+============
+crypto-email
+============
 
 .. raw:: html
 
@@ -8,22 +8,7 @@ mac-monitoring
     <br> 🚧 &nbsp;&nbsp;&nbsp;<b>Work-In-Progress</b>
   </p>
   
-The main objective is to build a monitoring program for macOS that will check for
-anomalies in your system (e.g. failed login attempts) and alert you of any 
-suspicious activities within your system. It will be able to save the reports 
-locally and/or send them through encrypted emails.
-
-`:warning:`
-
-  **Disclaimer**
-
-  This repository is for educational and informational purposes only. The
-  author, raul23, assumes no responsibility for the use of this repository,
-  code or any information contained therein. The user is solely responsible for
-  any action he/she takes with this repository, code and information contained
-  in it.
-
-  Do not abuse this material. Be responsible.
+Send and receive encrypted emails.
 
 .. contents:: **Contents**
    :depth: 3
@@ -32,8 +17,8 @@ locally and/or send them through encrypted emails.
    
 Python dependencies
 ===================
-- **Platform:** macOS
-- **Python:**  3.7
+- **Platform:** macOS and Linux
+- **Python:**  3.7+
 
 Install package
 ===============
