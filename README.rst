@@ -8,7 +8,7 @@ cryptoemail
     <br> 🚧 &nbsp;&nbsp;&nbsp;<b>Work-In-Progress</b>
   </p>
   
-Command-line program for sending and receiving encrypted emails.
+Python command-line program for sending and receiving encrypted emails.
 
 .. contents:: **Contents**
    :depth: 3
