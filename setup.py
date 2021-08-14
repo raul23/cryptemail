@@ -6,13 +6,13 @@ import sys
 from setuptools import find_packages, setup
 from setuptools.command.build_py import build_py as build_py_orig
 
-import monitoring
-from monitoring import __version__, __test_version__
+import cryptlib
+from cryptlib import __version__, __test_version__
 
 major, minor = 3, 7
 if sys.version_info < (major, minor):
     raise RuntimeError(f"""
-    {monitoring.__name__} v{__version__}+ supports Python {major}.{minor}
+    {cryptlib.__name__} v{__version__}+ supports Python {major}.{minor}
     and above.
     """)
 
@@ -58,9 +58,10 @@ with open(os.path.join(dirpath, "requirements.txt")) as f:
     REQUIREMENTS = f.read().splitlines()
 """
 
-setup(name='mac-monitoring',
+setup(name='cryptoemail',
       version=VERSION,
-      description='''Program for monitoring your Mac.''',
+      description='Command-line program for sending and receiving encrypted '
+                  'emails.',
       long_description=README,
       long_description_content_type='text/x-rst',
       classifiers=[
@@ -72,13 +73,10 @@ setup(name='mac-monitoring',
         'Natural Language :: English',
         'Operating System :: MacOS',
         'Programming Language :: Python :: 3',
-        'Topic :: System :: Monitoring',
-        'Topic :: System :: Networking :: Monitoring'
-        'Topic :: Security',
         'Topic :: Utilities'
       ],
-      keywords='networking monitoring',
-      url='https://github.com/raul23/mac-monitoring',
+      keywords='encryption cryptography email pgp gnupg',
+      url='https://github.com/raul23/cryptoemail',
       author='R',
       license='GPLv3',
       python_requires=f'>={major}.{minor}',
@@ -86,10 +84,10 @@ setup(name='mac-monitoring',
       cmdclass={'build_py': build_py},
       include_package_data=True,
       entry_points={
-        'console_scripts': ['monitor=monitoring.scripts.monitor:main']
+        'console_scripts': ['cryptoemail=cryptlib.scripts.cryptoemail:main']
       },
       project_urls={  # Optional
-          'Bug Reports': 'https://github.com/raul23/mac-monitoring/issues',
-          'Source': 'https://github.com/raul23/mac-monitoring',
+          'Bug Reports': 'https://github.com/raul23/cryptoemail/issues',
+          'Source': 'https://github.com/raul23/cryptoemail',
       },
       zip_safe=False)
