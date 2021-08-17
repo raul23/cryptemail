@@ -1,4 +1,4 @@
-"""setup.py file for the ``mac-monitoring`` package.
+"""setup.py file for the ``cryptoemail`` project.
 """
 import fnmatch
 import os
