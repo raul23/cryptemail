@@ -108,7 +108,7 @@ read_emails = {
     # Delete emails from the inbox after reading them
     'delete_emails_read': False,
     # If True, every new emails will be saved locally
-    'save_emails': True,
+    'save_emails': False,
     'add_decryption_results': False,
     # Folders for saving emails
     'valid_emails_dirpath': '/path/to/valid/emails/',
