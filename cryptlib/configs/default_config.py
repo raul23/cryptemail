@@ -5,8 +5,7 @@
 # ==============
 # Common options
 # ==============
-# Home directory where the keys (e.g. GnuPG) will be saved
-# if HOMEDIR is None or ''
+# Home directory where the keys will be saved
 HOMEDIR = '/path/to/homedir'
 ASYMMETRIC = {
     'name': 'asymmetric',
@@ -38,7 +37,7 @@ SENDER_EMAIL_ADDRESS = 'YOUR_SENDER_EMAIL_ADDRESS'
 READER_EMAIL_ADDRESS = 'YOUR_READER_EMAIL_ADDRESS'
 
 # googleapi can be used both for sending and reading emails
-# IMPORTANT: tokens-based authentication is only supported for gmail addresses
+# IMPORTANT: token-based authentication is only supported for gmail addresses
 # The use of tokens is more secure than using an email password
 googleapi = {
     'name': 'googleapi',
