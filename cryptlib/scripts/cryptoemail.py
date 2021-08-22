@@ -594,9 +594,6 @@ def setup_argparser():
     # ===============
     # Testing options
     # ===============
-    # ===============
-    # Testing options
-    # ===============
     testing_group = parser.add_argument_group('Testing options')
     testing_group.add_argument(
         '--rt', '--run-cfg-tests', dest='run_tests', action='store_true',
@@ -628,23 +625,23 @@ def setup_argparser():
     # Edit options
     # ============
     edit_group = parser.add_argument_group('Edit options')
-    # ========================
-    # Send/read emails options
-    # ========================
+    # ===================
+    # Send emails options
+    # ===================
     send_group = parser.add_argument_group('Send options')
     send_group.add_argument(
         '-s', '--send', dest='send_email', action='store_true',
-        help="Send an email encrypted. The encryption applied is the one "
+        help="Send an encrypted email. The encryption applied is the one "
              "defined in the config file.")
     send_group.add_argument(
         '-u', '--unencrypt', action='store_true',
         help="Don't encrypt the email.")
     send_group.add_argument(
         '--sign', action='store_true',
-        help="Sign the email based on the config file.")
-    send_group.add_argument('-m', '--email-message', metavar='STRING',
-                            nargs=2,
-                            help='Email subject and text.')
+        help="Sign the email. The signature applied is the one defined in the "
+             "config file.")
+    send_group.add_argument('-m', '--email-message', metavar='STRING', nargs=2,
+                            help='The email subject and text.')
     send_group.add_argument(
         '-p', '--email-path', metavar='PATH',
         help='Path to a text file containing the email to be sent.')
