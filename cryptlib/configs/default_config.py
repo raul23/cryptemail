@@ -33,8 +33,8 @@ PROMPT_PASSPHRASE = True
 # Connection options
 # ==================
 # NOTE: both addresses can be the same
-SENDER_EMAIL_ADDRESS = 'YOUR_SENDER_EMAIL_ADDRESS'
-READER_EMAIL_ADDRESS = 'YOUR_READER_EMAIL_ADDRESS'
+SENDER_EMAIL_ADDRESS = 'YOUR_SENDER_EMAIL_ADDRESS@mail.com'
+READER_EMAIL_ADDRESS = 'YOUR_READER_EMAIL_ADDRESS@mail.com'
 
 # googleapi can be used both for sending and reading emails
 # IMPORTANT: token-based authentication is only supported for gmail addresses
