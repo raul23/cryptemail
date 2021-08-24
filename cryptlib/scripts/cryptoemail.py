@@ -258,6 +258,10 @@ class CryptoEmail:
         config = self.config.send_emails
         result = Result()
         sign = None
+        if self.config.ASYMMETRIC['recipient_fingerprint'] == self.config.ASYMMETRIC['signature_fingerprint'] \
+                and config['encryption']['enable_encryption']:
+            logger.warning('Signing with the same encryption key. Both encryption '
+                           'and signature fingerprints are the same')
         if not config['signature']['enable_signature']:
             logger.info("No signature will be applied on the email")
         elif config['signature']['enable_signature'] and not config['use_single_pass']:
@@ -383,10 +387,6 @@ class CryptoEmail:
             error_msg = "Signature program not supported: " \
                         "{}\n".format(config['signature']['program'])
             raise ValueError(error_msg)
-        if self.config.ASYMMETRIC['recipient_fingerprint'] == self.config.ASYMMETRIC['signature_fingerprint'] \
-                and config['encryption']['enable_encryption']:
-            logger.warning('Signing with the same encryption key. Both encryption '
-                           'and signature fingerprints are the same')
         gpg = gnupg.GPG(gnupghome=self._check_gnupghome(self.config.HOMEDIR))
         passphrase = get_gpg_passphrase(
             prompt=self.config.PROMPT_PASSPHRASE,
@@ -522,10 +522,9 @@ def generate_random_string(n=10):
 
 
 def get_gpg_passphrase(prompt=False, gpg=None, recipient=None, message=None):
-    # TODO: urgent, remove the following (not necessary anymore)
     if gpg and recipient:
         logger.debug('Checking if the passphrase is already cached '
-                     '(by gpg-agent or keychain)')
+                     '(by gpg-agent)')
         msg = 'test'
         encrypted_data = gpg.encrypt(msg, recipient)
         decrypted_data = gpg.decrypt(str(encrypted_data),
