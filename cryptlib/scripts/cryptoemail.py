@@ -63,7 +63,41 @@ class CryptoEmail:
             logger.info('No action!')
 
     def _test_encryption(self):
-        logger.info('Testing encryption and decryption ...')
+        logger.info('### Testing encrypting/decrypting a message ###')
+        result = Result()
+        unencrypted_message = self.args.test_message
+        try:
+            encrypted_message = self._encrypt_message(unencrypted_message)
+        except ValueError as e:
+            error_msg = "The email couldn't be encrypted with the " \
+                        "program {}\n{}\n".format(
+                            self.config.send_emails['encryption']['program'], e)
+            logger.error(error_msg)
+            return result.set_error(error_msg)
+        logger.debug('Encrypted message:\n{}'.format(str(encrypted_message)))
+        logger.info('')
+        logger.info('## Encryption results ##')
+        logger.info('ok: {}'.format(encrypted_message.ok))
+        logger.info('status: {}'.format(encrypted_message.status))
+        logger.debug('stderr: {}'.format(encrypted_message.stderr))
+        gpg = gnupg.GPG(gnupghome=self._check_gnupghome(self.config.HOMEDIR))
+        decrypted_message = gpg.decrypt(str(encrypted_message))
+        logger.info('')
+        logger.info('## Decryption results ##')
+        logger.info('ok: {}'.format(decrypted_message.ok))
+        logger.info('status: {}'.format(decrypted_message.status))
+        logger.debug('stderr: {}'.format(decrypted_message.stderr))
+        logger.info('')
+        logger.info('Unencrypted message: {}'.format(unencrypted_message))
+        logger.info('Decrypted message: {}'.format(decrypted_message.data.decode()))
+        if unencrypted_message == decrypted_message.data.decode():
+            logger.info('Encryption/decryption successful!\n')
+            return result.set_success()
+        else:
+            error_msg = "The message couldn't be decrypted " \
+                        "correctly\n{}".format(decrypted_message.stderr)
+            logger.error(error_msg)
+            return result.set_error(error_msg)
 
     def _check_args(self):
         logger.debug('Checking args ...')
@@ -644,13 +678,15 @@ def setup_argparser():
         '--rt', '--run-cfg-tests', dest='run_tests', action='store_true',
         help='Run a battery of tests as defined in the config file.')
     testing_group.add_argument(
-        '--te', '--test-encryption', dest='test_encryption',
-        action='store_true',
+        '--te', '--test-encryption', dest='test_encryption', action='store_true',
         help='Test encrypting and decrypting a message. The encryption program '
              'used (e.g. GPG) is the one defined in the config file.')
     testing_group.add_argument(
         '--ts', '--test-signature', dest='test_signature', action='store_true',
         help='Test signing a message.')
+    testing_group.add_argument(
+        '--tm', '--test-message', dest='test_message', default='Hello, Wordl!',
+        help='Message to use for testing encryption or signing.')
     # TODO: important add support for test-connection
     testing_group.add_argument(
         '--tc', '--test-connection', metavar='CONNECTION',
