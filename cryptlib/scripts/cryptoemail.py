@@ -42,7 +42,6 @@ class CryptoEmail:
         self._check_config(self.config.__dict__)
         self.args = args
         self._check_args()
-        self.config.send_emails['encryption']['enable_encryption'] = False if self.args.unencrypt else True
         self.subject = None
         self.original_message_text = None
         self._get_message()
@@ -64,6 +63,16 @@ class CryptoEmail:
             logger.info('No action!')
 
     def _check_args(self):
+        logger.debug('Checking args ...')
+        if self.args.unencrypt:
+            logger.debug('enable_encryption = False')
+            self.config.send_emails['encryption']['enable_encryption'] = False
+        else:
+            logger.debug('enable_encryption = True')
+            self.config.send_emails['encryption']['enable_encryption'] = True
+        if self.args.sign:
+            logger.debug('enable_signature = True')
+            self.config.send_emails['signature']['enable_signature'] = True
         for k, v in self.args.__dict__.items():
             if k.endswith('path') and v:
                 setattr(self.args, k, os.path.expanduser(v))
@@ -137,9 +146,10 @@ class CryptoEmail:
         service = build('gmail', 'v1', credentials=creds)
         return service
 
-    def _encrypt_message(self, unencrypted_msg, sign):
+    def _encrypt_message(self, unencrypted_msg, sign=None):
         config = self.config.send_emails
         recipient = self.config.ASYMMETRIC['recipient_fingerprint']
+        # TODO: remove following lines
         """
         try:
             cmd = 'gpg --full-generate-key --expert --homedir ' \
@@ -164,8 +174,7 @@ class CryptoEmail:
                     prompt=self.config.PROMPT_PASSPHRASE,
                     gpg=gpg,
                     recipient=recipient,
-                    message='Enter your GPG passphrase for signing',
-                    use_pinentry_mac=config['use_pinentry_mac'])
+                    message='Enter your GPG passphrase for signing')
             return gpg.encrypt(msg, recipient, sign=sign, passphrase=passphrase)
 
         encryption_program = config['encryption'].get('program')
@@ -232,8 +241,14 @@ class CryptoEmail:
                 error_msg = "Empty line missing after the 'Subject:' line"
                 raise ValueError(error_msg)
         else:
-            logger.debug(f"Email subject = '{self.subject}' and email text = "
-                         f"'{self.original_message_text}'")
+            error_msg = f"No email message given; Subject: {self.subject} " \
+                        f"and Text: {self.original_message_text}"
+            raise ValueError(error_msg)
+        # Remove "Subject:" if connecting to email server with googlapi
+        if self.config.send_emails['connection_method']['name'] == 'googleapi':
+            if self.subject.startswith('Subject:'):
+                logger.debug(f"Removing 'Subject:' from '{self.subject}'")
+                self.subject = self.subject[len('Subject:'):].strip()
 
     def _read_emails(self):
         logger.info('Reading emails ...')
@@ -250,7 +265,7 @@ class CryptoEmail:
                 signed_message = self._sign_message(message_text)
                 message_text = str(signed_message)
             except ValueError as e:
-                error_msg = "The email couldn't be signed with the program" \
+                error_msg = "The email couldn't be signed with the program " \
                             "{}\n{}".format(config['signature']['program'], e)
                 logger.error(error_msg)
                 return result.set_error(error_msg)
@@ -342,8 +357,10 @@ class CryptoEmail:
         msg = create_message(self.config.send_emails['sender_email_address'],
                              self.config.send_emails['receiver_email_address'],
                              self.subject, message_text)
-        logger.debug('Message to be sent to {}:\n{}'.format(
-            self.config.send_emails['receiver_email_address'], message_text))
+        logger.debug('Message to be sent to {}:\nSubject: {}\n\n{}'.format(
+            self.config.send_emails['receiver_email_address'],
+            self.subject,
+            message_text))
         logger.info('Sending email...')
         result_send = send_message(service,
                                    self.config.send_emails['sender_email_address'], msg)
@@ -356,55 +373,29 @@ class CryptoEmail:
             logger.error(error_msg + '\n')
             return result.set_error(error_msg)
 
+    # TODO: provide signature fingerprint as param?
     def _sign_message(self, message_text):
         config = self.config.send_emails
         if config['signature']['program'] == 'GPG':
-            logger.info("Signing message (fingerprint='{}') "
-                        "...".format(config['signature']['fingerprint']))
+            logger.info("Signing message (recipient='{}') ...".format(
+                self.config.ASYMMETRIC['recipient_fingerprint']))
         else:
             error_msg = "Signature program not supported: " \
-                        "{}\n".format(config['signature']['signature_program'])
+                        "{}\n".format(config['signature']['program'])
             raise ValueError(error_msg)
-        gpg = gnupg.GPG(
-            gnupghome=self._check_gnupghome(config['signature'].get('gnupghome')))
-        passphrase = None
-        if config['encryption']['fingerprint'] == config['signature']['fingerprint']:
-            same_keys = True
-        else:
-            same_keys = False
-        if config['encryption']['enable_encryption'] and same_keys:
-            logger.warning('Signing with the same encrypting keys. Both encryption '
+        if self.config.ASYMMETRIC['recipient_fingerprint'] == self.config.ASYMMETRIC['signature_fingerprint'] \
+                and config['encryption']['enable_encryption']:
+            logger.warning('Signing with the same encryption key. Both encryption '
                            'and signature fingerprints are the same')
-        if not self._check_fingerprint_in_keyring(config['signature']['fingerprint'], gpg) \
-                or (config['encryption']['enable_encryption'] and same_keys):
-            if config['reuse_keys']:
-                logger.warning(
-                    "Reusing previous encryption keys for signing "
-                    "(fingerprint='{}')".format(config['encryption']['fingerprint']))
-                config['signature']['fingerprint'] = config['encryption']['fingerprint']
-            else:
-                logger.debug('The encryption keys will not be reused for signing')
-                if config['signature']['prompt_generate_keys']:
-                    key, passphrase = generate_keys(
-                        gpg, config['prompt_passphrase'],
-                        use_pinentry_mac=config['use_pinentry_mac'],
-                        message='### Generating keys for signing ###',
-                        return_passphrase=True)
-                    config['signature']['fingerprint'] = key.fingerprint
-                    logger.info("Signing message (fingerprint='{}') "
-                                "...".format(config['signature']['fingerprint']))
-                else:
-                    error_msg = "Couldn't generate keys for signing"
-                    # TODO: important, another exception type?
-                    raise ValueError(error_msg)
+        gpg = gnupg.GPG(gnupghome=self._check_gnupghome(self.config.HOMEDIR))
         passphrase = get_gpg_passphrase(
-            prompt=config['prompt_passphrase'],
+            prompt=self.config.PROMPT_PASSPHRASE,
             gpg=gpg,
-            recipient=config['signature']['fingerprint'],
-            message='Enter your GPG passphrase for signing',
-            use_pinentry_mac=config['use_pinentry_mac'],
-            passphrase=passphrase)
-        message = gpg.sign(message_text, keyid=config['signature']['fingerprint'],
+            recipient=self.config.ASYMMETRIC['signature_fingerprint'],
+            message="Enter your GPG passphrase for signing with fingerprint="
+                    f"'{self.config.ASYMMETRIC['signature_fingerprint']}'")
+        message = gpg.sign(message_text,
+                           keyid=self.config.ASYMMETRIC['signature_fingerprint'],
                            passphrase=passphrase)
         del passphrase
         if message.status == 'signature created':
@@ -530,11 +521,7 @@ def generate_random_string(n=10):
     return ''.join([choice(string.ascii_uppercase + string.digits) for _ in range(n)])
 
 
-def get_gpg_passphrase(prompt=False, gpg=None, recipient=None, message=None,
-                       use_pinentry_mac=False, passphrase=''):
-    if (passphrase or passphrase is None) and use_pinentry_mac:
-        return passphrase
-
+def get_gpg_passphrase(prompt=False, gpg=None, recipient=None, message=None):
     # TODO: urgent, remove the following (not necessary anymore)
     if gpg and recipient:
         logger.debug('Checking if the passphrase is already cached '
@@ -544,17 +531,15 @@ def get_gpg_passphrase(prompt=False, gpg=None, recipient=None, message=None,
         decrypted_data = gpg.decrypt(str(encrypted_data),
                                      passphrase=generate_random_string())
         if msg == decrypted_data.data.decode():
-            logger.warning("The GPG passphrase is already cached")
+            logger.info("The GPG passphrase is already cached")
             return None
-
     if prompt:
         if message:
             print(message)
         password = getpass.getpass(prompt='GPG passphrase: ')
     else:
-        # TODO: important, get passphrase from os.environ
-        error_msg = "No GPG passphrase could be retrieved. Thus, GPG " \
-                    "encryption can't be applied"
+        # TODO: important, get passphrase from keyring
+        error_msg = "No GPG passphrase could be retrieved"
         raise ValueError(error_msg)
     return password
 
