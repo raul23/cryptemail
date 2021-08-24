@@ -42,8 +42,8 @@ class CryptoEmail:
         self._check_config(self.config.__dict__)
         self.args = args
         self._check_args()
-        self.subject = None
-        self.original_message_text = None
+        self.subject = ''
+        self.original_message_text = ''
         self._get_message()
 
     def run(self):
@@ -54,13 +54,16 @@ class CryptoEmail:
         elif self.args.run_tests:
             logger.info('Running tests from config file ...')
         elif self.args.test_encryption:
-            logger.info('Testing encryption and decryption ...')
+            self._test_encryption()
         elif self.args.test_signature:
             logger.info('Testing signature ...')
         elif self.args.test_connection:
             self._test_connection()
         else:
             logger.info('No action!')
+
+    def _test_encryption(self):
+        logger.info('Testing encryption and decryption ...')
 
     def _check_args(self):
         logger.debug('Checking args ...')
@@ -87,10 +90,12 @@ class CryptoEmail:
         self._check_gnupghome(self.config.HOMEDIR)
 
     @staticmethod
-    def _check_email_subject(subject):
-        if not subject.startswith('Subject:'):
-            logger.info('Subject line:\n{}'.format(subject))
-            error_msg = "The subject line should start with 'Subject:'"
+    def _check_subject_and_text(subject, text):
+        if (subject.startswith('Subject:') and not subject.strip('Subject:')) \
+                or not subject:
+            logger.warning('Message subject is empty')
+        if not text:
+            error_msg = f"No message text given"
             raise ValueError(error_msg)
 
     @staticmethod
@@ -233,17 +238,16 @@ class CryptoEmail:
                 email_message = f.read()
             lines = email_message.splitlines()
             self.subject = lines[0]
-            self._check_email_subject(self.subject)
+            if not self.subject.startswith('Subject:'):
+                logger.info('Subject line:\n{}'.format(self.subject))
+                error_msg = "The subject line should start with 'Subject:'"
+                raise ValueError(error_msg)
             self.original_message_text = '\n'.join(lines[2:])
             # Check email message text
             if not lines[1] == '':
                 logger.info('Email message content:\n{}'.format(email_message))
                 error_msg = "Empty line missing after the 'Subject:' line"
                 raise ValueError(error_msg)
-        else:
-            error_msg = f"No email message given; Subject: {self.subject} " \
-                        f"and Text: {self.original_message_text}"
-            raise ValueError(error_msg)
         # Remove "Subject:" if connecting to email server with googlapi
         if self.config.send_emails['connection_method']['name'] == 'googleapi':
             if self.subject.startswith('Subject:'):
@@ -254,12 +258,14 @@ class CryptoEmail:
         logger.info('Reading emails ...')
 
     def _send_email(self):
+        self._check_subject_and_text(self.subject, self.original_message_text)
         message_text = self.original_message_text
         config = self.config.send_emails
         result = Result()
         sign = None
         if self.config.ASYMMETRIC['recipient_fingerprint'] == self.config.ASYMMETRIC['signature_fingerprint'] \
-                and config['encryption']['enable_encryption']:
+                and config['encryption']['enable_encryption'] \
+                and config['signature']['enable_signature']:
             logger.warning('Signing with the same encryption key. Both encryption '
                            'and signature fingerprints are the same')
         if not config['signature']['enable_signature']:
