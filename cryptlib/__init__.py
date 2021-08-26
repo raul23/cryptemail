@@ -1,4 +1,4 @@
 __version__ = '0.1.0a1'
 # For debugging purposes
 __test_version__ = '0.1.0a1'
-__project_name = 'cryptoemail'
+__project_name__ = 'cryptoemail'
