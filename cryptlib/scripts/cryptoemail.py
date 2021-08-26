@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import argparse
 import base64
 import getpass
 import importlib
@@ -24,6 +23,8 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 
 import cryptlib
+from cryptlib.configs import default_config
+from cryptlib.utils.genutils import *
 
 logging.basicConfig(format='%(levelname)-8s %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -663,22 +664,53 @@ def send_message(service, user_id, message):
 
 def setup_argparser():
     # Setup the parser
+    width = os.get_terminal_size().columns - 5
     parser = argparse.ArgumentParser(
         # usage="%(prog)s [OPTIONS]",
         # prog=os.path.basename(__file__),
-        description='Command-line program for sending and receiving encrypted '
+        description='Command-line program for sending and reading encrypted '
                     'emails.',
-        # formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+        usage=usage(__file__),
+        add_help=False,
+        # ArgumentDefaultsHelpFormatter
+        # HelpFormatter
+        # RawDescriptionHelpFormatter
+        formatter_class=lambda prog: MyFormatter(
+            prog, max_help_position=50, width=width))
     # ===============
     # General options
     # ===============
-    parser.add_argument('-v', '--version', action='version',
-                        version='%(prog)s {}'.format(cryptlib.__version__))
+    general_group = parser.add_argument_group(f"{yellow('General options')}")
+    general_group.add_argument('-h', '--help', action='help',
+                               help='Show this help message and exit.')
+    general_group.add_argument(
+        '-v', '--version', action='version',
+        version=f'%(prog)s v{cryptlib.__version__}',
+        help="Show program's version number and exit.")
+    general_group.add_argument(
+        '-q', '--quiet', action='store_true',
+        help='Enable quiet mode, i.e. nothing will be printed.')
+    general_group.add_argument(
+        '--verbose', action='store_true',
+        help='Print various debugging information, e.g. print traceback '
+             'when there is an exception.')
+    general_group.add_argument(
+        '-l', '--log-level', dest='log_level',
+        choices=['debug', 'info', 'warning', 'error'],
+        default=default_config.logging_level,
+        help='Set logging level for all loggers.'
+             + default(default_config.logging_level))
+    # TODO: explain each format
+    general_group.add_argument(
+        '-f', '--log-format', dest='log_format',
+        choices=['console', 'simple', 'only_msg'],
+        default=default_config.logging_formatter,
+        help='Set logging formatter for all loggers.'
+             + default(default_config.logging_formatter))
     # ===============
     # Testing options
     # ===============
-    testing_group = parser.add_argument_group('Testing options')
+    testing_group = parser.add_argument_group(f"{yellow('Testing options')}")
     testing_group.add_argument(
         '--rt', '--run-cfg-tests', dest='run_tests', action='store_true',
         help='Run a battery of tests as defined in the config file.')
@@ -691,7 +723,8 @@ def setup_argparser():
         help='Test signing a message.')
     testing_group.add_argument(
         '--tm', '--test-message', dest='test_message', default='Hello, Wordl!',
-        help='Message to use for testing encryption or signing.')
+        help='Message to be used for testing encryption or signing.'
+             + default(default_config.test_message))
     # TODO: important add support for test-connection
     testing_group.add_argument(
         '--tc', '--test-connection', metavar='CONNECTION',
@@ -702,19 +735,33 @@ def setup_argparser():
     # Uninstall options
     # =================
     # TODO: important, use subcommands
-    uninstall_group = parser.add_argument_group('Uninstall options')
+    uninstall_group = parser.add_argument_group(f"{yellow('Uninstall options')}")
     uninstall_group.add_argument(
-        '--uninstall', choices=['program', 'everything'],
-        help="Uninstall the '{}' program or everything (including config and "
-             "log files).".format(cryptlib.__project_name))
-    # ============
-    # Edit options
-    # ============
-    edit_group = parser.add_argument_group('Edit options')
+        '--uninstall', choices=['package', 'everything'],
+        help="Uninstall the `package` (including the program '{}') or "
+             "`everything` (including config and log files).".format(
+            prog_name(__file__)))
+    # ============================
+    # Edit cryptoemail config file
+    # ============================
+    edit_group = parser.add_argument_group(
+        f"{yellow('Edit/reset the daemon configuration file')}")
+    edit_mutual_group = edit_group.add_mutually_exclusive_group()
+    edit_mutual_group.add_argument(
+        '-e', '--edit', action='store_true',
+        help=f'Edit the {prog_name(__file__)} configuration file.')
+    edit_group.add_argument(
+        '-a', '--app', dest='app',
+        help='Name of the application to use for editing the daemon '
+             'configuration file. If no name is given, then the default '
+             'application for opening this type of file (.py) will be used.')
+    edit_mutual_group.add_argument(
+        '--reset', action='store_true',
+        help='Reset the daemon configuration file to factory values.')
     # ===================
     # Send emails options
     # ===================
-    send_group = parser.add_argument_group('Send options')
+    send_group = parser.add_argument_group(f"{yellow('Send options')}")
     send_group.add_argument(
         '-s', '--send', dest='send_email', action='store_true',
         help="Send an encrypted email. The encryption applied is the one "
@@ -734,12 +781,12 @@ def setup_argparser():
     # ===================
     # Read emails options
     # ===================
-    send_group = parser.add_argument_group('Read options')
+    send_group = parser.add_argument_group(f"{yellow('Read options')}")
     send_group.add_argument(
         '-r', '--read', dest='read_emails',
         action='store_true',
-        help="Read emails from your inbox which might contain "
-             "unencrypted and encrypted emails.")
+        help='Read emails from your inbox which might contain '
+             'unencrypted and encrypted emails.')
     return parser
 
 
