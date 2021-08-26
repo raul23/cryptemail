@@ -5,12 +5,9 @@ import getpass
 import importlib
 import logging
 import os
-import shlex
 import smtplib
-import socket
 import ssl
 import string
-import subprocess
 import sys
 from email.mime.text import MIMEText
 from secrets import choice
@@ -45,22 +42,29 @@ class CryptoEmail:
         self.subject = ''
         self.original_message_text = ''
         self._get_message()
+        self.tester = Tester()
 
     def run(self):
         if self.args.send_email:
             self._send_email()
-        elif self.args.read_emails:
+        if self.args.read_emails:
             self._read_emails()
-        elif self.args.run_tests:
-            logger.info('Running tests from config file ...')
-        elif self.args.test_encryption:
-            self._test_encryption()
-        elif self.args.test_signature:
-            self._test_signature()
-        elif self.args.test_connection:
-            self._test_connection()
-        else:
-            logger.info('No action!')
+        if self.args.run_tests:
+            self._run_tests()
+        if self.args.test_encryption:
+            self._test_encryption(self.args.test_message)
+        if self.args.test_signature:
+            self._test_signature(self.args.test_message)
+        if self.args.test_connection:
+            self._test_connection(self.args.test_connection)
+        if self.args.uninstall:
+            self._uninstall()
+        if self.tester.n_tests:
+            logger.info('### Test results ###')
+            logger.info('Success rate: {}/{} = {}%\n'.format(
+                self.tester.n_success, self.tester.n_tests,
+                int(self.tester.success_rate * 100)))
+        return 0
 
     def _check_args(self):
         logger.debug('Checking args ...')
@@ -274,6 +278,15 @@ class CryptoEmail:
     def _read_emails(self):
         logger.info('Reading emails ...')
 
+    def _run_tests(self):
+        logger.info('Running tests from config file ...\n')
+        if self.config.test_encryption:
+            self._test_encryption(self.config.test_message)
+        if self.config.test_signature:
+            self._test_signature(self.config.test_message)
+        if self.config.test_connection:
+            self._test_connection(self.config.test_connection['name'])
+
     def _send_email(self):
         self._check_subject_and_text(self.subject, self.original_message_text)
         message_text = self.original_message_text
@@ -408,10 +421,10 @@ class CryptoEmail:
             error_msg = "{}\n".format(message.stderr.strip())
             raise ValueError(error_msg)
 
-    def _test_connection(self):
-        logger.info(f"### Testing connection with '{self.args.test_connection}' ###")
+    def _test_connection(self, connection):
+        logger.info(f"### Testing connection with '{connection}' ###")
         result = Result()
-        if self.args.test_connection == 'googleapi':
+        if connection == 'googleapi':
             self.config.send_emails['connection_method'] = self.config.googleapi
             auth_config = self.config.send_emails['connection_method']
             service = self._connect_with_tokens(
@@ -421,7 +434,7 @@ class CryptoEmail:
                 scopes=auth_config['sender_auth']['scopes'])
             logger.debug("Scopes: "
                          f"{service._rootDesc['auth']['oauth2']['scopes']['https://mail.google.com/']['description']}")
-        elif self.args.test_connection == 'smtp':
+        elif connection == 'smtp':
             self.config.send_emails['connection_method'] = self.config.smtp
             smtp_config = self.config.send_emails['connection_method']
             password = self._get_email_password(
@@ -431,19 +444,20 @@ class CryptoEmail:
             with smtplib.SMTP(smtp_config['smtp_server'],
                               smtp_config['tls_port']) as server:
                 retval = self._login_stmp(server, password)
-                if retval:
-                    return retval
+                result = retval if retval else result
         else:
-            error_msg = 'Connection method not supported: ' \
-                        f'{self.args.test_connection }'
-            return result.set_error(error_msg)
-        logger.info('Connection successful!')
-        return result.set_success()
+            error_msg = f'Connection method not supported: {connection}\n'
+            result.set_error(error_msg)
+        if not result.exit_code:
+            logger.info('Connection successful!\n')
+            result.set_success()
+        self.tester.update_report(test_type='testing connection', result=result)
+        return result
 
-    def _test_encryption(self):
+    def _test_encryption(self, message):
         logger.info('### Testing encrypting/decrypting a message ###')
         result = Result()
-        unencrypted_message = self.args.test_message
+        unencrypted_message = message
         try:
             encrypted_message = self._encrypt_message(unencrypted_message)
         except ValueError as e:
@@ -470,17 +484,19 @@ class CryptoEmail:
         logger.info('Decrypted message: {}'.format(decrypted_message.data.decode()))
         if unencrypted_message == decrypted_message.data.decode():
             logger.info('Encryption/decryption successful!\n')
-            return result.set_success()
+            result.set_success()
         else:
             error_msg = "The message couldn't be decrypted " \
                         "correctly\n{}".format(decrypted_message.stderr)
             logger.error(error_msg)
-            return result.set_error(error_msg)
+            result.set_error(error_msg)
+        self.tester.update_report(test_type='testing encryption/decryption',
+                                  result=result)
+        return result
 
-    def _test_signature(self):
+    def _test_signature(self, message):
         logger.info('### Testing signing a message ###')
         result = Result()
-        message = self.args.test_message
         logger.info('Message to be signed: {}'.format(message))
         signed_message = self._sign_message(message)
         gpg = gnupg.GPG(gnupghome=self.config.HOMEDIR)
@@ -493,12 +509,17 @@ class CryptoEmail:
         logger.info('')
         if verify.valid:
             logger.info('Signing message successful!\n')
-            return result.set_success()
+            result.set_success()
         else:
             error_msg = "The message couldn't be " \
                         "signed\n{}".format(verify.stderr)
             logger.error(error_msg)
-            return result.set_error(error_msg)
+            result.set_error(error_msg)
+        self.tester.update_report(test_type='testing signing', result=result)
+        return result
+
+    def _uninstall(self):
+        logger.info('Uninstalling package ...')
 
 
 class Result:
@@ -522,6 +543,26 @@ class Result:
         self.warning_msg = msg
         self.exit_code = exit_code
         return self
+
+
+class Tester:
+    def __init__(self):
+        self.report = {}
+        self.n_tests = 0
+        self.n_fails = 0
+        self.n_success = 0
+        self.success_rate = 0
+
+    def update_tests(self, test_type):
+        self.n_tests += 1
+        self.n_fails += 1 if self.report[test_type][-1].exit_code == 1 else 0
+        self.n_success = self.n_tests - self.n_fails
+        self.success_rate = self.n_success / self.n_tests
+
+    def update_report(self, test_type, result):
+        self.report.setdefault(test_type, [])
+        self.report[test_type].append(result)
+        self.update_tests(test_type)
 
 
 # TODO: add reference (google)
