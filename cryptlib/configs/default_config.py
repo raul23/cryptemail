@@ -20,6 +20,19 @@ ASYMMETRIC = {
 # Passphrase will be used for decryption
 PROMPT_PASSPHRASE = True
 
+# ===============
+# General options
+# ===============
+quiet = False
+verbose = False
+logging_level = 'info'
+logging_formatter = 'only_msg'
+
+# =============
+# Edit options
+# ============
+app = None
+
 # ==================
 # Connection options
 # ==================
@@ -101,6 +114,9 @@ test_encryption = True
 
 # Test message signature
 test_signature = True
+
+# Message to be used for testing encryption or signing
+test_message = "Hello, World!"
 
 # Test connection to an email server either through googleapi, smtp or None
 # If None, then no connection testing will done
