@@ -9,7 +9,9 @@ import smtplib
 import ssl
 import string
 import sys
+import traceback
 from email.mime.text import MIMEText
+from functools import wraps
 from secrets import choice
 from urllib import parse
 
@@ -286,6 +288,7 @@ class CryptoEmail:
             self._test_signature(self.config.test_message)
         if self.config.test_connection:
             self._test_connection(self.config.test_connection['name'])
+        logger.info('End tests from config file\n')
 
     def _send_email(self):
         self._check_subject_and_text(self.subject, self.original_message_text)
@@ -421,6 +424,26 @@ class CryptoEmail:
             error_msg = "{}\n".format(message.stderr.strip())
             raise ValueError(error_msg)
 
+    def _update_report(test_type):
+        def update_decorator(func):
+            @wraps(func)
+            def wrapped_function(*args, **kwargs):
+                # self is always the first argument
+                self = args[0]
+                try:
+                    result = func(*args, **kwargs)
+                except Exception as e:
+                    result = Result()
+                    # TODO: logger.error(e) if no traceback to be shown
+                    error_msg = f'{traceback.format_exc()}'.strip()
+                    logger.error(f'{error_msg}\n')
+                    result.set_error(e)
+                self.tester.update_report(test_type=test_type, result=result)
+                return result
+            return wrapped_function
+        return update_decorator
+
+    @_update_report('testing connection')
     def _test_connection(self, connection):
         logger.info(f"### Testing connection with '{connection}' ###")
         result = Result()
@@ -451,9 +474,9 @@ class CryptoEmail:
         if not result.exit_code:
             logger.info('Connection successful!\n')
             result.set_success()
-        self.tester.update_report(test_type='testing connection', result=result)
         return result
 
+    @_update_report('testing encryption/decryption')
     def _test_encryption(self, message):
         logger.info('### Testing encrypting/decrypting a message ###')
         result = Result()
@@ -490,15 +513,21 @@ class CryptoEmail:
                         "correctly\n{}".format(decrypted_message.stderr)
             logger.error(error_msg)
             result.set_error(error_msg)
-        self.tester.update_report(test_type='testing encryption/decryption',
-                                  result=result)
         return result
 
+    @_update_report('testing signing')
     def _test_signature(self, message):
         logger.info('### Testing signing a message ###')
         result = Result()
         logger.info('Message to be signed: {}'.format(message))
-        signed_message = self._sign_message(message)
+        try:
+            signed_message = self._sign_message(message)
+        except ValueError as e:
+            error_msg = "The message couldn't be " \
+                        "signed\n{}".format(e)
+            logger.error(error_msg)
+            result.set_error(error_msg)
+            return result
         gpg = gnupg.GPG(gnupghome=self.config.HOMEDIR)
         verify = gpg.verify(signed_message.data)
         logger.info('')
@@ -515,7 +544,6 @@ class CryptoEmail:
                         "signed\n{}".format(verify.stderr)
             logger.error(error_msg)
             result.set_error(error_msg)
-        self.tester.update_report(test_type='testing signing', result=result)
         return result
 
     def _uninstall(self):
@@ -669,7 +697,7 @@ def setup_argparser():
         '--tc', '--test-connection', metavar='CONNECTION',
         dest='test_connection', choices=['googleapi', 'smtp'],
         help='Test connecting to an email server either with tokens '
-             '(`googleapi`) or with an email password (`smtp`).')
+             '(`googleapi`) or an email password (`smtp`).')
     # =================
     # Uninstall options
     # =================
