@@ -56,48 +56,11 @@ class CryptoEmail:
         elif self.args.test_encryption:
             self._test_encryption()
         elif self.args.test_signature:
-            logger.info('Testing signature ...')
+            self._test_signature()
         elif self.args.test_connection:
             self._test_connection()
         else:
             logger.info('No action!')
-
-    def _test_encryption(self):
-        logger.info('### Testing encrypting/decrypting a message ###')
-        result = Result()
-        unencrypted_message = self.args.test_message
-        try:
-            encrypted_message = self._encrypt_message(unencrypted_message)
-        except ValueError as e:
-            error_msg = "The email couldn't be encrypted with the " \
-                        "program {}\n{}\n".format(
-                            self.config.send_emails['encryption']['program'], e)
-            logger.error(error_msg)
-            return result.set_error(error_msg)
-        logger.debug('Encrypted message:\n{}'.format(str(encrypted_message)))
-        logger.info('')
-        logger.info('## Encryption results ##')
-        logger.info('ok: {}'.format(encrypted_message.ok))
-        logger.info('status: {}'.format(encrypted_message.status))
-        logger.debug('stderr: {}'.format(encrypted_message.stderr))
-        gpg = gnupg.GPG(gnupghome=self._check_gnupghome(self.config.HOMEDIR))
-        decrypted_message = gpg.decrypt(str(encrypted_message))
-        logger.info('')
-        logger.info('## Decryption results ##')
-        logger.info('ok: {}'.format(decrypted_message.ok))
-        logger.info('status: {}'.format(decrypted_message.status))
-        logger.debug('stderr: {}'.format(decrypted_message.stderr))
-        logger.info('')
-        logger.info('Unencrypted message: {}'.format(unencrypted_message))
-        logger.info('Decrypted message: {}'.format(decrypted_message.data.decode()))
-        if unencrypted_message == decrypted_message.data.decode():
-            logger.info('Encryption/decryption successful!\n')
-            return result.set_success()
-        else:
-            error_msg = "The message couldn't be decrypted " \
-                        "correctly\n{}".format(decrypted_message.stderr)
-            logger.error(error_msg)
-            return result.set_error(error_msg)
 
     def _check_args(self):
         logger.debug('Checking args ...')
@@ -124,15 +87,6 @@ class CryptoEmail:
         self._check_gnupghome(self.config.HOMEDIR)
 
     @staticmethod
-    def _check_subject_and_text(subject, text):
-        if (subject.startswith('Subject:') and not subject.strip('Subject:')) \
-                or not subject:
-            logger.warning('Message subject is empty')
-        if not text:
-            error_msg = f"No message text given"
-            raise ValueError(error_msg)
-
-    @staticmethod
     def _check_fingerprint_in_keyring(fingerprint, gpg):
         logger.debug("Checking fingerprint='{}' ...".format(fingerprint))
         if fingerprint not in gpg.list_keys().fingerprints:
@@ -147,6 +101,15 @@ class CryptoEmail:
             logger.warning('gnupghome is None and will thus take whatever gpg '
                            'defaults to (e.g. ~/.gnupg)')
         return gnupghome if gnupghome else None
+
+    @staticmethod
+    def _check_subject_and_text(subject, text):
+        if (subject.startswith('Subject:') and not subject.strip('Subject:')) \
+                or not subject:
+            logger.warning('Message subject is empty')
+        if not text:
+            error_msg = f"No message text given"
+            raise ValueError(error_msg)
 
     @staticmethod
     def _connect_with_tokens(email_account, connection_type, credentials_path, scopes):
@@ -227,7 +190,7 @@ class CryptoEmail:
                         "program".format(encryption_program)
             raise ValueError(error_msg)
         if encryption_program == 'GPG':
-            gpg = gnupg.GPG(gnupghome=self._check_gnupghome(self.config.HOMEDIR))
+            gpg = gnupg.GPG(gnupghome=self.config.HOMEDIR)
             if self._check_fingerprint_in_keyring(recipient, gpg):
                 encrypted_msg = encrypt_using_gpg(unencrypted_msg)
                 status = encrypted_msg.status
@@ -287,6 +250,26 @@ class CryptoEmail:
             if self.subject.startswith('Subject:'):
                 logger.debug(f"Removing 'Subject:' from '{self.subject}'")
                 self.subject = self.subject[len('Subject:'):].strip()
+
+    def _login_stmp(self, server, password):
+        result = Result()
+        context = ssl.create_default_context()
+        server.ehlo()  # Can be omitted
+        server.starttls(context=context)
+        server.ehlo()  # Can be omitted
+        # Success: (235, b'2.7.0 Accepted')
+        # Fail (printed): *** smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted.
+        try:
+            server.login(self.config.send_emails['sender_email_address'], password)
+            del password
+        except smtplib.SMTPAuthenticationError as e:
+            error_msg = "Login to '{}' failed".format(
+                self.config.send_emails['sender_email_address'])
+            logger.error(e)
+            logger.warning(error_msg + '\n')
+            return result.set_error(error_msg)
+        else:
+            return 0
 
     def _read_emails(self):
         logger.info('Reading emails ...')
@@ -369,26 +352,6 @@ class CryptoEmail:
             logger.info('Message sent!\n')
         return result.set_success()
 
-    def _login_stmp(self, server, password):
-        result = Result()
-        context = ssl.create_default_context()
-        server.ehlo()  # Can be omitted
-        server.starttls(context=context)
-        server.ehlo()  # Can be omitted
-        # Success: (235, b'2.7.0 Accepted')
-        # Fail (printed): *** smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted.
-        try:
-            server.login(self.config.send_emails['sender_email_address'], password)
-            del password
-        except smtplib.SMTPAuthenticationError as e:
-            error_msg = "Login to '{}' failed".format(
-                self.config.send_emails['sender_email_address'])
-            logger.error(e)
-            logger.warning(error_msg + '\n')
-            return result.set_error(error_msg)
-        else:
-            return 0
-
     def _send_email_with_tokens(self, message_text):
         result = Result()
         auth_config = self.config.send_emails['connection_method']
@@ -427,7 +390,7 @@ class CryptoEmail:
             error_msg = "Signature program not supported: " \
                         "{}\n".format(config['signature']['program'])
             raise ValueError(error_msg)
-        gpg = gnupg.GPG(gnupghome=self._check_gnupghome(self.config.HOMEDIR))
+        gpg = gnupg.GPG(gnupghome=self.config.HOMEDIR)
         passphrase = get_gpg_passphrase(
             prompt=self.config.PROMPT_PASSPHRASE,
             gpg=gpg,
@@ -446,7 +409,7 @@ class CryptoEmail:
             raise ValueError(error_msg)
 
     def _test_connection(self):
-        logger.info(f"Testing connection with '{self.args.test_connection}'")
+        logger.info(f"### Testing connection with '{self.args.test_connection}' ###")
         result = Result()
         if self.args.test_connection == 'googleapi':
             self.config.send_emails['connection_method'] = self.config.googleapi
@@ -459,6 +422,7 @@ class CryptoEmail:
             logger.debug("Scopes: "
                          f"{service._rootDesc['auth']['oauth2']['scopes']['https://mail.google.com/']['description']}")
         elif self.args.test_connection == 'smtp':
+            self.config.send_emails['connection_method'] = self.config.smtp
             smtp_config = self.config.send_emails['connection_method']
             password = self._get_email_password(
                 self.config.send_emails['sender_email_address'],
@@ -475,6 +439,66 @@ class CryptoEmail:
             return result.set_error(error_msg)
         logger.info('Connection successful!')
         return result.set_success()
+
+    def _test_encryption(self):
+        logger.info('### Testing encrypting/decrypting a message ###')
+        result = Result()
+        unencrypted_message = self.args.test_message
+        try:
+            encrypted_message = self._encrypt_message(unencrypted_message)
+        except ValueError as e:
+            error_msg = "The email couldn't be encrypted with the " \
+                        "program {}\n{}\n".format(
+                            self.config.send_emails['encryption']['program'], e)
+            logger.error(error_msg)
+            return result.set_error(error_msg)
+        logger.debug('Encrypted message:\n{}'.format(str(encrypted_message)))
+        logger.info('')
+        logger.info('## Encryption results ##')
+        logger.info('ok: {}'.format(encrypted_message.ok))
+        logger.info('status: {}'.format(encrypted_message.status))
+        logger.debug('stderr: {}'.format(encrypted_message.stderr))
+        gpg = gnupg.GPG(gnupghome=self.config.HOMEDIR)
+        decrypted_message = gpg.decrypt(str(encrypted_message))
+        logger.info('')
+        logger.info('## Decryption results ##')
+        logger.info('ok: {}'.format(decrypted_message.ok))
+        logger.info('status: {}'.format(decrypted_message.status))
+        logger.debug('stderr: {}'.format(decrypted_message.stderr))
+        logger.info('')
+        logger.info('Unencrypted message: {}'.format(unencrypted_message))
+        logger.info('Decrypted message: {}'.format(decrypted_message.data.decode()))
+        if unencrypted_message == decrypted_message.data.decode():
+            logger.info('Encryption/decryption successful!\n')
+            return result.set_success()
+        else:
+            error_msg = "The message couldn't be decrypted " \
+                        "correctly\n{}".format(decrypted_message.stderr)
+            logger.error(error_msg)
+            return result.set_error(error_msg)
+
+    def _test_signature(self):
+        logger.info('### Testing signing a message ###')
+        result = Result()
+        message = self.args.test_message
+        logger.info('Message to be signed: {}'.format(message))
+        signed_message = self._sign_message(message)
+        gpg = gnupg.GPG(gnupghome=self.config.HOMEDIR)
+        verify = gpg.verify(signed_message.data)
+        logger.info('')
+        logger.info('## Signature results ##')
+        logger.info('valid: {}'.format(verify.valid))
+        logger.info('status: {}'.format(verify.status))
+        logger.debug('stderr: {}'.format(verify.stderr))
+        logger.info('')
+        if verify.valid:
+            logger.info('Signing message successful!\n')
+            return result.set_success()
+        else:
+            error_msg = "The message couldn't be " \
+                        "signed\n{}".format(verify.stderr)
+            logger.error(error_msg)
+            return result.set_error(error_msg)
 
 
 class Result:
@@ -520,42 +544,6 @@ def create_message(sender, to, subject, message_text):
     return {'raw': base64.urlsafe_b64encode(message.as_bytes()).decode()}
 
 
-def generate_keys(gpg, prompt_passphrase, use_pinentry_mac=False, message=None,
-                  return_passphrase=False):
-    if message:
-        print('\n' + message)
-    else:
-        print('')
-    print('Enter the following data to generate the new keys \nNOTE: '
-          'if nothing is entered for a field, then the default '
-          'value will be used\n')
-    name_email = prompt_name_email()
-    print()
-    key_type = prompt_key_type()
-    print()
-    key_length = prompt_key_length()
-    if use_pinentry_mac:
-        passphrase = ''
-    else:
-        print()
-        passphrase = get_gpg_passphrase(prompt_passphrase)
-    print('\nGenerating keys...')
-    input_data = gpg.gen_key_input(
-        name_email=name_email,
-        key_type=key_type,
-        key_length=key_length,
-        passphrase=passphrase)
-    key = gpg.gen_key(input_data)
-    print('\nFingerprint associated with the newly generated keys: {}'.format(key))
-    input('Press any key to continue...\n')
-    if return_passphrase:
-        passphrase = None if passphrase == '' else passphrase
-        return key, passphrase
-    else:
-        del return_passphrase
-        return key
-
-
 # Ref.: https://stackoverflow.com/a/41464693
 def generate_random_string(n=10):
     return ''.join([choice(string.ascii_uppercase + string.digits) for _ in range(n)])
@@ -581,58 +569,6 @@ def get_gpg_passphrase(prompt=False, gpg=None, recipient=None, message=None):
         error_msg = "No GPG passphrase could be retrieved"
         raise ValueError(error_msg)
     return password
-
-
-def prompt_key_length():
-    default = 4096
-    while True:
-        print('Enter key length (int) of the generated key in bits (default: '
-              '{})'.format(default))
-        key_length = input('key length: ')
-        if key_length == '':
-            # TODO: important, show default value for key length
-            print('Default value ({}) will be used'.format(default))
-            return 4096
-        try:
-            key_length = int(key_length)
-            if key_length <= 0:
-                raise ValueError
-        except ValueError:
-            print('Invalid key length!')
-        else:
-            return key_length
-
-
-def prompt_key_type():
-    default = 'RSA'
-    choices = ['RSA', 'DSA', 'ELG-E']
-    while True:
-        print('Enter key type (choices: {})'.format(', '.join(choices)))
-        key_type = input('key type: ')
-        if key_type in choices:
-            return key_type
-        elif key_type == '':
-            # TODO: important, show default value for key type
-            print('Default value will be used: {}'.format(default))
-            return default
-        else:
-            print('Invalid key type!')
-
-
-def prompt_name_email():
-    # print('Enter name email')
-    # From gnupg.gen_key_input()
-    logname = (os.environ.get('LOGNAME') or os.environ.get('USERNAME') or
-               'unspecified')
-    # default = '{}@{}'.format(getpass.getuser(), socket.gethostname())
-    default = '{}@{}'.format(logname.replace(' ', '_'), socket.gethostname())
-    print('Enter name email (default: {})'.format(default))
-    name_email = input('Name email: ')
-    if name_email == '':
-        # TODO: important, check if this is the default value for name_email
-        print('Default value will be used: {}'.format(default))
-        name_email = default
-    return name_email
 
 
 # TODO: add reference (google)
