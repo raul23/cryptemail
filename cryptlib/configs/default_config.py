@@ -6,11 +6,9 @@
 # Common options
 # ==============
 # Home directory where the keys (e.g. GnuPG) will be saved
-# TODO: important, add support to read HOMEDIR from environment variable GNUPGHOME
-# if HOMEDIR is None or ''
-HOMEDIR = '/path/to/homedir'
-ASYMMETRIC = {
-    'name': 'asymmetric',
+# if homedir is None or ''
+homedir = '/path/to/homedir'
+asymmetric = {
     # Recipient's fingerprint (for encryption when sending an email)
     'recipient_fingerprint': 'RECIPIENT_FINGERPRINT',
     # Your signature fingerprint
@@ -18,7 +16,7 @@ ASYMMETRIC = {
 }
 # If the passphrase can't be found saved locally, prompt for it
 # Passphrase will be used for decryption
-PROMPT_PASSPHRASE = True
+prompt_passphrase = True
 
 # ===============
 # General options
@@ -36,15 +34,12 @@ app = None
 # ==================
 # Connection options
 # ==================
-# NOTE: both addresses can be the same
-SENDER_EMAIL_ADDRESS = 'YOUR_SENDER_EMAIL_ADDRESS@email.com'
-READER_EMAIL_ADDRESS = 'YOUR_READER_EMAIL_ADDRESS@email.com'
+inbox_address = 'your_inbox@mail.com'
 
 # googleapi can be used both for sending and reading emails
 # IMPORTANT: token-based authentication is only supported for gmail addresses
 # The use of tokens is more secure than using an email password
 googleapi = {
-    'name': 'googleapi',
     'sender': {
         'credentials_path': '/path/to/credentials.json',
         # Scopes for the gmail google API
@@ -60,7 +55,6 @@ googleapi = {
 # tls is used for sending emails
 # imap is used for reading emails
 smtp = {
-    'name': 'smtp',
     'tls_port': 587,
     'imap_port': 1143,
     'smtp_server': 'smtp.gmail.com',
@@ -75,10 +69,10 @@ smtp = {
 # Config options for sending emails
 send_emails = {
     # How to connect to the email server: googleapi or smtp
-    'connection_method': googleapi,
+    'connection_method': 'googleapi',
     # FROM and TO information
-    'sender_email_address': SENDER_EMAIL_ADDRESS,  # FROM
-    'receiver_email_address': READER_EMAIL_ADDRESS,  # TO
+    'sender_email_address': inbox_address,  # FROM
+    'receiver_email_address': 'receiver@mail.com',  # TO
     # Sign and encrypt in a single pass. Otherwise, sign first and then encrypt
     # as separate processes
     'use_single_pass': False,
@@ -90,15 +84,15 @@ send_emails = {
     # Encryption options
     'encryption': {
         'program': 'PGP',
-        'encryption_type': ASYMMETRIC
+        'encryption_type': 'asymmetric'
     }
 }
 
 # Config options for reading emails
 read_emails = {
     # How to connect to the email server for reading emails: googleapi or smtp
-    'connection_method': googleapi,
-    'reader_email_address': READER_EMAIL_ADDRESS,
+    'connection_method': 'googleapi',
+    'reader_email_address': inbox_address,
     'add_decryption_results': False,
     # Folders for saving emails
     'valid_emails_dirpath': '/path/to/valid/emails/',
@@ -120,4 +114,4 @@ test_message = "Hello, World!"
 
 # Test connection to an email server either through googleapi, smtp or None
 # If None, then no connection testing will done
-test_connection = googleapi
+test_connection = 'googleapi'
