@@ -68,13 +68,13 @@ logging = {
         # -----------------------------
         # Loggers using console handler
         # -----------------------------
-        "monitoring.edit":
+        "cryptlib.edit":
         {
           "level": "DEBUG",
           "handlers": ["console"],
           "propagate": False
         },
-        "scripts.monitor":
+        "scripts.cryptoemail":
         {
           "level": "DEBUG",
           "handlers": ["console"],
