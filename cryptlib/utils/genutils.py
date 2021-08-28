@@ -250,6 +250,7 @@ def override_config_with_args(main_config, args):
                                  f"argument '{arg_name}'")
                     set_opt_val(arg_name, arg_val, main_config)
                     results.args_not_found_in_config.append((arg_name, config_val, arg_val))
+                # else: arg_val is None and this will be the value for config_val
 
     main_config = vars(main_config)
     args = args.__dict__
