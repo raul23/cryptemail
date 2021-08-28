@@ -739,10 +739,12 @@ def setup_argparser():
         default=default_config.logging_formatter,
         help='Set logging formatter for all loggers.'
              + default(default_config.logging_formatter))
+    """
     general_group.add_argument(
         '-i', '--inbox-address', metavar='ADDRESS',
         dest='inbox_address',
         help='Inbox address (e.g. my_email@address.com)')
+    """
     # ===============
     # Testing options
     # ===============
