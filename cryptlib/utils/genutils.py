@@ -235,7 +235,9 @@ def override_config_with_args(main_config, args):
         for arg_name, arg_val in list(user_args.items()):
             arg_val = get_opt_val(arg_name, user_args)
             config_val = get_opt_val(arg_name, main_config, use_config=True)
-            if arg_val is not None:
+            if arg_val is False and config_val is True:
+                continue
+            elif arg_val is not None:
                 if arg_val != config_val:
                     # User specified a value in the command-line/config file
                     set_opt_val(arg_name, arg_val, main_config)
@@ -250,14 +252,12 @@ def override_config_with_args(main_config, args):
                                  f"argument '{arg_name}'")
                     set_opt_val(arg_name, arg_val, main_config)
                     results.args_not_found_in_config.append((arg_name, config_val, arg_val))
-                # else: arg_val is None and this will be the value for config_val
 
     main_config = vars(main_config)
     args = args.__dict__
-    results = namedtuple("results", "args_not_found_in_config config_opts_overridden msg")
+    results = namedtuple("results", "args_not_found_in_config config_opts_overridden")
     results.args_not_found_in_config = []
     results.config_opts_overridden = []
-    results.msg = 'Config options overridden by command-line arguments:\n'
     user_args = args.copy()
     process_user_args()
     return results
@@ -304,9 +304,9 @@ def setup_log(package=None, script_name=None, log_filepath=None,
     # =============
     if package:
         script_name = script_name if script_name else package.__name__
-        logger.info("Running {} v{}".format(script_name,
-                                            package.__version__))
-    logger.info("Verbose option {}".format(
+        logger.debug("Running {} v{}".format(script_name,
+                                             package.__version__))
+    logger.debug("Verbose option {}".format(
         "enabled" if verbose else "disabled"))
     logger.debug("Working directory: {}".format(package_path))
     logger.debug(main_log_msg)
