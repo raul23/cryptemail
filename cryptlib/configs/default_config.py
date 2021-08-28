@@ -24,7 +24,7 @@ prompt_passphrase = True
 quiet = False
 verbose = False
 logging_level = 'info'
-logging_formatter = 'only_msg'
+logging_formatter = 'simple'
 
 # =============
 # Edit options
