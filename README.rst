@@ -36,6 +36,3 @@ Python dependencies
   .. code-block:: bash
 
      cryptoemail -u
-
-Scripts
-=======
