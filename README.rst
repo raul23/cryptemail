@@ -16,18 +16,19 @@ Python command-line program for sending and reading encrypted emails.
    :backlinks: top
  
 .. 
-Python dependencies
-===================
-- **Platform:** macOS and Linux
-- **Python:**  3.7+
 
-  Install package
-  ===============
-  To install the ``cryptoemail`` package:
+  Python dependencies
+  ===================
+  - **Platform:** macOS and Linux
+  - **Python:**  3.7+
 
-  .. code-block:: bash
+    Install package
+    ===============
+    To install the ``cryptoemail`` package:
 
-     pip install git+https://github.com/raul23/crypto-email#egg=crypto-email
+    .. code-block:: bash
+
+       pip install git+https://github.com/raul23/crypto-email#egg=crypto-email
 
   Uninstall package
   =================
