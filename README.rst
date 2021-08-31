@@ -16,7 +16,6 @@ Python command-line program for sending and reading encrypted emails.
    :backlinks: top
  
 .. 
-
   Python dependencies
   ===================
   - **Platform:** macOS and Linux
