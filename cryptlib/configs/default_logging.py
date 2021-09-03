@@ -1,97 +1,99 @@
+from cryptlib import LOGS_PATH
+
 logging = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters":
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters':
     {
-        "console":
+        'console':
         {
-          "format": "%(name)-{auto_field_width}s | %(levelname)-8s | %(message)s"
+          'format': '%(name)-{auto_field_width}s | %(levelname)-8s | %(message)s'
         },
-        "console_time":
+        'console_time':
         {
-          "format": "%(asctime)s | %(levelname)-8s | %(message)s"
+          'format': '%(asctime)s | %(levelname)-8s | %(message)s'
         },
-        "only_msg":
+        'only_msg':
         {
-          "format": "%(message)s"
+          'format': '%(message)s'
         },
-        "simple":
+        'simple':
         {
-          "format": "%(levelname)-8s %(message)s"
+          'format': '%(levelname)-8s %(message)s'
         },
-        "simple2":
+        'simple2':
         {
-          "format": "%(levelname)-8s | %(message)s"
+          'format': '%(levelname)-8s | %(message)s'
         },
-        "verbose":
+        'verbose':
         {
-          "format": "%(asctime)s | %(name)-{auto_field_width}s | %(levelname)-8s | %(message)s"
+          'format': '%(asctime)s | %(name)-{auto_field_width}s | %(levelname)-8s | %(message)s'
         }
     },
 
-    "handlers":
+    'handlers':
     {
-        "console":
+        'console':
         {
-          "level": "WARNING",
-          "class": "logging.StreamHandler",
-          "formatter": "only_msg"
+          'level': 'WARNING',
+          'class': 'logging.StreamHandler',
+          'formatter': 'only_msg'
         },
-        "console_only_msg":
+        'console_only_msg':
         {
-          "level": "INFO",
-          "class": "logging.StreamHandler",
-          "formatter": "only_msg"
+          'level': 'INFO',
+          'class': 'logging.StreamHandler',
+          'formatter': 'only_msg'
         },
-        "file":
+        'file':
         {
-          "level": "INFO",
-          "class": "logging.FileHandler",
-          "filename": "debug.log",
-          "mode": "a",
-          "formatter": "simple",
-          "delay": True
+          'level': 'INFO',
+          'class': 'logging.FileHandler',
+          'filename': LOGS_PATH,
+          'mode': 'a',
+          'formatter': 'verbose',
+          'delay': True
         }
     },
 
-    "loggers":
+    'loggers':
     {
         # --------------------------------------
         # Loggers using console_only_msg handler
         # --------------------------------------
-        "data":
+        'data':
         {
-          "level": "INFO",
-          "handlers": ["console_only_msg"],
-          "propagate": False
+          'level': 'INFO',
+          'handlers': ['console_only_msg'],
+          'propagate': False
         },
         # -----------------------------
         # Loggers using console handler
         # -----------------------------
-        "cryptlib.edit":
+        'cryptlib.edit':
         {
-          "level": "DEBUG",
-          "handlers": ["console"],
-          "propagate": False
+          'level': 'INFO',
+          'handlers': ['console', 'file'],
+          'propagate': False
         },
-        "scripts.cryptoemail":
+        'scripts.cryptoemail':
         {
-          "level": "DEBUG",
-          "handlers": ["console"],
-          "propagate": False
+          'level': 'INFO',
+          'handlers': ['console', 'file'],
+          'propagate': False
         },
-        "utils.genutils":
+        'utils.genutils':
         {
-          "level": "DEBUG",
-          "handlers": ["console"],
-          "propagate": False
+          'level': 'INFO',
+          'handlers': ['console', 'file'],
+          'propagate': False
         },
     },
 
-    "root":
+    'root':
     {
-        "level": "INFO",
-        "handlers": ["console"],
-        "propagate": False
+        'level': 'INFO',
+        'handlers': ['console'],
+        'propagate': False
     }
 }
