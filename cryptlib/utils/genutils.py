@@ -341,21 +341,31 @@ def color(msg, msg_color='y', bold=False):
 
 
 def default(default_value):
-    msg = f"default: {default_value}"
-    return f" ({color(msg, 'g')})"
+    return green(f'(default: {default_value})')
 
 
-def usage(script_filename):
-    msg = f"{prog_name(script_filename)} [OPTIONS]"
-    return f"{color(msg, 'b')}"
+def main_usage(script_filename):
+    return blue(f'{prog_name(script_filename)} [-h] [-v] subcommands ...')
+
+
+def subcomand_usage(script_filename, subcommand):
+    return blue(f'{prog_name(script_filename)} {subcommand} [OPTIONS]')
+
+
+def blue(msg):
+    return color(msg, 'b')
+
+
+def green(msg):
+    return color(msg, 'g')
 
 
 def red(msg):
-    return f"{color(msg, 'r')}"
+    return color(msg, 'r')
 
 
 def yellow(msg):
-    return f"{color(msg)}"
+    return color(msg)
 
 
 # -------------------------------
