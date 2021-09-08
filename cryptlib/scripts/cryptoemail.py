@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import base64
 import getpass
+import re
+import readline
 import smtplib
 import ssl
 import string
@@ -27,68 +29,150 @@ logger = init_log(__name__, __file__)
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 logging.getLogger('gnupg').setLevel(logging.ERROR)
 
-# ==================================
-# Default cryptoemail config options
-# ==================================
-PROJECT_NAME = cryptlib.__project_name__
-# Logs
-# ====
-# Logs directory
-LOGS_DIR = f'/var/log/{PROJECT_NAME}'
-# Logs file
-LOGS_PATH = os.path.join(LOGS_DIR, 'logs.txt')
-# Project
-# =======
-# Project directory
-PROJECT_DIR = os.path.expanduser(f'~/.{PROJECT_NAME}')
-# Configuration files within project directory
-CONFIG_PATH = os.path.join(PROJECT_DIR, 'config.py')
-LOGGING_PATH = os.path.join(PROJECT_DIR, 'logging.py')
+CONNECTIONS = {'tokens': 'googleapi', 'password': 'smtp_imap'}
 
 
 class CryptoEmail:
     def __init__(self, config):
         self.config = config
+        self._check_args()
         self._check_config(self.config.__dict__)
         self._check_gnupghome(self.config.homedir)
-        self._check_args()
         self.subject = ''
         self.original_message_text = ''
-        self._get_message()
         self.tester = Tester()
+        self._missing_data = False
+
+    def _interact(self):
+        if (self.config.run_tests and (self.config.test_encryption or self.config.test_signature)) or \
+                self.config.args_test_encryption or self.config.args_test_signature \
+                or self.config.subcommand in ['send', 'read']:
+            if self.config.homedir == default_config.homedir:
+                self.config.homedir = self._input('homedir: ', is_path=True)
+        if (self.config.run_tests and self.config.test_encryption) or self.config.args_test_encryption or \
+                (self.config.subcommand == 'send' and self.config.send_emails['encrypt']['enable_encryption']):
+            if self.config.send_emails['encrypt']['recipient_userid'] == \
+                    default_config.send_emails['encrypt']['recipient_userid']:
+                self.config.send_emails['encrypt']['recipient_userid'] = self._input('recipient_userid: ', is_userid=True)
+        if ((self.config.run_tests and self.config.test_signature) or self.config.args_test_signature or
+                (self.config.subcommand == 'send' and self.config.send_emails['sign']['enable_signature'])):
+            if self.config.send_emails['sign']['signature'] == default_config.send_emails['sign']['signature']:
+                self.config.send_emails['sign']['signature'] = self._input('signature: ', is_userid=True)
+        if (self.config.run_tests and self.config.test_connection) or \
+                self.config.args_test_connection or self.config.subcommand in ['send', 'read']:
+            if self.config.mailbox_address == default_config.mailbox_address:
+                self.config.mailbox_address = self._input('mailbox_address: ', is_address=True)
+            if ((self.config.subcommand in ['send', 'read']) and self.config.connection_method == 'googleapi') \
+                    or (self.config.run_tests and
+                        self.config.test_connection == 'googleapi') or \
+                    self.config.args_test_connection == 'googleapi':
+                if self.config.googleapi['credentials_path'] \
+                        == default_config.googleapi['credentials_path']:
+                    self.config.googleapi['credentials_path'] = \
+                        self._input('credentials_path: ', is_path=True)
+            if (self.config.subcommand == 'send' and self.config.connection_method == 'smtp_imap')  \
+                    or (self.config.run_tests and
+                        self.config.test_connection == 'smtp_imap') or \
+                    self.config.args_test_connection == 'smtp_imap':
+                if self.config.smtp_imap['smtp_server'] \
+                        == default_config.smtp_imap['smtp_server']:
+                    self.config.smtp_imap['smtp_server'] = \
+                        self._input('smtp_server: ', is_server=True)
+            if self.config.subcommand == 'read' and self.config.connection_method == 'smtp_imap':
+                if self.config.smtp_imap['imap_server'] \
+                        == default_config.smtp_imap['imap_server']:
+                    self.config.smtp_imap['imap_server'] = \
+                        self._input('imap_server: ', is_server=True)
+            if self.config.subcommand == 'send':
+                if self.config.send_emails['receiver_email_address'] \
+                        == default_config.send_emails['receiver_email_address']:
+                    self.config.send_emails['receiver_email_address'] = \
+                        self._input('(Receiver) email_address: ', is_address=True)
+        if self._missing_data:
+            print('')
+        self._missing_data = False
+
+    def _input(self, prompt, values=None, lower=False, is_path=False,
+               is_userid=False, is_address=False, is_server=False):
+        if not self._missing_data:
+            print('\nEnter the following data')
+            self._missing_data = True
+        while True:
+            ans = input(prompt)
+            ans = ans.lower() if lower else ans
+            if values:
+                if ans in values:
+                    return ans
+                else:
+                    print('Invalid value!')
+            elif is_path:
+                ans = os.path.expanduser(ans)
+                if os.path.exists(ans):
+                    return ans
+                else:
+                    print("Path doesn't exist!")
+            elif is_userid:
+                if os.path.exists(self.config.homedir):
+                    gpg = gnupg.GPG(gnupghome=self.config.homedir)
+                    if self._fingerprint_exists(ans, gpg):
+                        return ans
+                    else:
+                        print("userid not found!")
+                else:
+                    return ans
+            elif is_address:
+                if self._is_valid_email(ans):
+                    return ans
+                else:
+                    print("Invalid address!")
+            elif is_server:
+                if self._is_valid_servername(ans):
+                    return ans
+                else:
+                    print("Invalid server name!")
 
     def run(self):
-        if self.config.send:
-            self._send_email()
-        if self.config.read:
-            self._read_emails()
-        if self.config.run_tests:
-            self._run_tests()
-        else:
-            if self.config.args_test_encryption:
-                self._test_encryption(self.config.test_message)
-            if self.config.args_test_signature:
-                self._test_signature(self.config.test_message)
-            if self.config.args_test_connection:
-                self._test_connection(self.config.test_connection)
-        if self.tester.n_tests:
-            logger.info('### Test results ###')
-            logger.info('Success rate: {}/{} = {}%\n'.format(
-                self.tester.n_success, self.tester.n_tests,
-                int(self.tester.success_rate * 100)))
+        if self.config.interactive:
+            self._interact()
+        # ===========
+        # Subcommands
+        # ===========
+        if self.config.subcommand == 'send':
+            self._get_message()
+            return self._send_email().exit_code
+        if self.config.subcommand == 'read':
+            return self._read_emails()
+        if self.config.subcommand == 'test':
+            if self.config.run_tests:
+                self._run_tests()
+            else:
+                if self.config.args_test_encryption:
+                    self._test_encryption(self.config.test_message)
+                if self.config.args_test_signature:
+                    self._test_signature(self.config.test_message)
+                if self.config.args_test_connection:
+                    self._test_connection(self.config.args_test_connection)
+            if self.tester.n_tests:
+                logger.info('### Test results ###')
+                logger.info('Success rate: {}/{} = {}%\n'.format(
+                    self.tester.n_success, self.tester.n_tests,
+                    int(self.tester.success_rate * 100)))
+            else:
+                logger.info('No tests!')
         return 0
 
     def _check_args(self):
         logger.debug('Checking args ...')
         if getattr(self.config, 'unencrypt', None):
             logger.debug('enable_encryption = False')
-            self.config.send_emails['encryption']['enable_encryption'] = False
+            self.config.send_emails['encrypt']['enable_encryption'] = False
         else:
             logger.debug('enable_encryption = True')
-            self.config.send_emails['encryption']['enable_encryption'] = True
+            self.config.send_emails['encrypt']['enable_encryption'] = True
         if getattr(self.config, 'sign', None):
             logger.debug('enable_signature = True')
-            self.config.send_emails['signature']['enable_signature'] = True
+            self.config.send_emails['sign']['enable_signature'] = True
+            self.config.send_emails['sign']['signature'] = self.config.sign
 
     def _check_config(self, config):
         for k, v in config.items():
@@ -101,13 +185,29 @@ class CryptoEmail:
                     config[k] = os.path.expanduser(v)
 
     @staticmethod
-    def _check_fingerprint_in_keyring(fingerprint, gpg):
+    def _is_valid_email(email):
+        regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        if re.fullmatch(regex, email):
+            return 1
+        else:
+            return 0
+
+    @staticmethod
+    def _is_valid_servername(servername):
+        regex = r'\b(smtp|imap)\.[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        if re.fullmatch(regex, servername):
+            return 1
+        else:
+            return 0
+
+    @staticmethod
+    def _fingerprint_exists(fingerprint, gpg):
         logger.debug("Checking fingerprint='{}' ...".format(fingerprint))
         if fingerprint not in gpg.list_keys().fingerprints:
-            logger.warning("The fingerprint='{}' was not found in the "
-                           "keyring".format(fingerprint))
-            return False
-        return True
+            logger.debug("The fingerprint='{}' was not found in the "
+                         "keyring".format(fingerprint))
+            return 0
+        return 1
 
     @staticmethod
     def _check_gnupghome(gnupghome):
@@ -163,21 +263,9 @@ class CryptoEmail:
 
     def _encrypt_message(self, unencrypted_msg, sign=None):
         config = self.config.send_emails
-        recipient = self.config.asymmetric['recipient_fingerprint']
-        # TODO: remove following lines
-        """
-        try:
-            cmd = 'gpg --full-generate-key --expert --homedir ' \
-                  f'{self.config.HOMEDIR}'
-            import ipdb
-            ipdb.set_trace()
-            output = subprocess.run(shlex.split(cmd), capture_output=True)
-            result = subprocess.check_output(shlex.split(cmd),
-                                             stderr=subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            logger.error('Error with log command: {}'.format(e.__repr__()))
-            exit_code = 1
-        """
+        recipient = self.config.send_emails['encrypt']['recipient_userid']
+        # TODO: remove following line
+        # gpg --full-generate-key --expert --homedir
 
         def encrypt_using_gpg(msg):
             start = 'Signing and encrypting' if sign else 'Encrypting'
@@ -186,13 +274,13 @@ class CryptoEmail:
             passphrase = None
             if sign:
                 passphrase = get_gpg_passphrase(
-                    prompt=self.config.prompt_passphrase,
+                    prompt=self.config.prompt_passwords,
                     gpg=gpg,
                     recipient=recipient,
                     message='Enter your GPG passphrase for signing')
             return gpg.encrypt(msg, recipient, sign=sign, passphrase=passphrase)
 
-        encryption_program = config['encryption'].get('program')
+        encryption_program = config['encrypt'].get('program')
         if encryption_program in ['GPG']:
             logger.debug("Encrypting the message with the encryption program "
                          "'{}'".format(encryption_program))
@@ -204,7 +292,7 @@ class CryptoEmail:
             raise ValueError(error_msg)
         if encryption_program == 'GPG':
             gpg = gnupg.GPG(gnupghome=self.config.homedir)
-            if self._check_fingerprint_in_keyring(recipient, gpg):
+            if self._fingerprint_exists(recipient, gpg):
                 encrypted_msg = encrypt_using_gpg(unencrypted_msg)
                 status = encrypted_msg.status
                 stderr = encrypted_msg.stderr.strip()
@@ -259,7 +347,7 @@ class CryptoEmail:
                 error_msg = "Empty line missing after the 'Subject:' line"
                 raise ValueError(error_msg)
         # Remove "Subject:" if connecting to email server with googlapi
-        if self.config.send_emails['connection_method'] == 'googleapi':
+        if self.config.connection_method == 'googleapi':
             if self.subject.startswith('Subject:'):
                 logger.debug(f"Removing 'Subject:' from '{self.subject}'")
                 self.subject = self.subject[len('Subject:'):].strip()
@@ -273,11 +361,11 @@ class CryptoEmail:
         # Success: (235, b'2.7.0 Accepted')
         # Fail (printed): *** smtplib.SMTPAuthenticationError: (535, b'5.7.8 Username and Password not accepted.
         try:
-            server.login(self.config.send_emails['sender_email_address'], password)
+            server.login(self.config.mailbox_address, password)
             del password
         except smtplib.SMTPAuthenticationError as e:
             error_msg = "Login to '{}' failed".format(
-                self.config.send_emails['sender_email_address'])
+                self.config.mailbox_address)
             logger.error(e)
             logger.warning(error_msg + '\n')
             return result.set_error(error_msg)
@@ -286,6 +374,7 @@ class CryptoEmail:
 
     def _read_emails(self):
         logger.info('Reading emails ...')
+        return 0
 
     def _run_tests(self):
         logger.info('Running tests from config file ...\n')
@@ -303,52 +392,55 @@ class CryptoEmail:
         config = self.config.send_emails
         result = Result()
         sign = None
-        if self.config.asymmetric['recipient_fingerprint'] \
-                == self.config.asymmetric['signature_fingerprint'] \
-                and config['encryption']['enable_encryption'] \
-                and config['signature']['enable_signature']:
-            logger.warning('Signing with the same encryption key. Both encryption '
-                           'and signature fingerprints are the same')
-        if not config['signature']['enable_signature']:
+        if config['encrypt']['recipient_userid'] \
+                == config['sign']['signature'] \
+                and config['encrypt']['enable_encryption'] \
+                and config['sign']['enable_signature']:
+            logger.warning('Signing with the same encryption key. Both '
+                           'encryption and signature fingerprints are the same')
+        if not config['sign']['enable_signature']:
             logger.info("No signature will be applied on the email")
-        elif config['signature']['enable_signature'] and not config['use_single_pass']:
+        elif config['sign']['enable_signature'] and \
+                (not config['use_single_pass']
+                 or not config['encrypt']['enable_encryption']):
             try:
                 signed_message = self._sign_message(message_text)
                 message_text = str(signed_message)
             except ValueError as e:
                 error_msg = "The email couldn't be signed with the program " \
-                            "{}\n{}".format(config['signature']['program'], e)
+                            "{}\n{}\n".format(config['sign']['program'], e)
                 logger.error(error_msg)
                 return result.set_error(error_msg)
-        elif config['signature']['enable_signature'] and \
-                config['encryption']['enable_encryption'] \
+        elif config['sign']['enable_signature'] and \
+                config['encrypt']['enable_encryption'] \
                 and config['use_single_pass']:
-            sign = self.config.asymmetric['signature_fingerprint']
-        if config['encryption']['enable_encryption']:
+            sign = config['sign']['signature']
+        if config['encrypt']['enable_encryption']:
             try:
                 encrypted_message = self._encrypt_message(message_text, sign)
                 message_text = str(encrypted_message)
             except ValueError as e:
                 error_msg = "The email couldn't be encrypted with the " \
                             "program {}\n{}\n".format(
-                                config['encryption']['program'], e)
+                                config['encrypt']['program'], e)
                 logger.error(error_msg)
                 return result.set_error(error_msg)
         else:
             logger.info('No encryption will be applied on the email')
         # Connect to the email provider server and send the encrypted email
         logger.info(f"sender email address: "
-                    f"{self.config.send_emails['sender_email_address']}")
+                    f"{self.config.mailbox_address}")
         logger.info(f"receiver email address: "
                     f"{self.config.send_emails['receiver_email_address']}")
-        if config['connection_method'] == 'googleapi':
+        if self.config.connection_method == 'googleapi':
             return self._send_email_with_tokens(message_text)
         else:
             return self._send_email_with_password(message_text)
 
     def _send_email_with_password(self, message_text):
         config = self.config.send_emails
-        smtp_config = self.config.send_emails['connection_method']
+        connection_type = self.config.connection_method
+        smtp_config = getattr(self.config, connection_type)
         logger.info(f"Connecting to the email server with 'smtp'")
         logger.debug('Logging to the smtp server using a PASSWORD (less '
                      'secure than with TOKENS)')
@@ -357,8 +449,8 @@ class CryptoEmail:
 {}
 
 {}""".format(self.subject, message_text)
-        password = self._get_email_password(config['sender_email_address'],
-                                            smtp_config['prompt_email_password'])
+        password = self._get_email_password(self.config.mailbox_address,
+                                            self.config.prompt_passwords)
         if password is None:
             error_msg = "No email password could be retrieved. Thus, the " \
                         "email can't be sent."
@@ -366,7 +458,7 @@ class CryptoEmail:
             return result.set_error(error_msg)
         logger.info('Connecting to the smtp server...')
         with smtplib.SMTP(smtp_config['smtp_server'],
-                          smtp_config['tls_port']) as server:
+                          smtp_config['smtp_port']) as server:
             retval = self._login_stmp(server, password)
             if retval:
                 return retval
@@ -375,22 +467,22 @@ class CryptoEmail:
             logger.debug('Message to be sent to {}:\n{}'.format(
                 config['receiver_email_address'], message))
             logger.info('Sending email...')
-            server.sendmail(config['sender_email_address'],
+            server.sendmail(self.config.mailbox_address,
                             config['receiver_email_address'], message)
             logger.info('Message sent!\n')
         return result.set_success()
 
     def _send_email_with_tokens(self, message_text):
         result = Result()
-        connection_type = self.config.send_emails['connection_method']
+        connection_type = self.config.connection_method
         auth_config = getattr(self.config, connection_type)
         service = self._connect_with_tokens(
-            email_account=self.config.send_emails['sender_email_address'],
+            email_account=self.config.mailbox_address,
             connection_type=connection_type,
-            credentials_path=auth_config['sender_auth']['credentials_path'],
-            scopes=auth_config['sender_auth']['scopes'])
+            credentials_path=auth_config['credentials_path'],
+            scopes=auth_config['scopes_for_sending'])
         # Call the Gmail API
-        msg = create_message(self.config.send_emails['sender_email_address'],
+        msg = create_message(self.config.mailbox_address,
                              self.config.send_emails['receiver_email_address'],
                              self.subject, message_text)
         logger.debug("Message to be sent to "
@@ -398,7 +490,7 @@ class CryptoEmail:
                      f"Subject: {self.subject}\n\n{message_text}")
         logger.info('Sending email...')
         result_send = send_message(
-            service, self.config.send_emails['sender_email_address'], msg)
+            service, self.config.mailbox_address, msg)
         if result_send is None:
             error_msg = "send_message() returned None. Thus, email couldn't " \
                         "be sent"
@@ -417,22 +509,22 @@ class CryptoEmail:
     # TODO: provide signature fingerprint as param?
     def _sign_message(self, message_text):
         config = self.config.send_emails
-        if config['signature']['program'] == 'GPG':
+        if config['sign']['program'] == 'GPG':
             logger.info("Signing message (recipient='{}') ...".format(
-                self.config.asymmetric['recipient_fingerprint']))
+                config['encrypt']['recipient_userid']))
         else:
             error_msg = "Signature program not supported: " \
-                        "{}\n".format(config['signature']['program'])
+                        "{}\n".format(config['sign']['program'])
             raise ValueError(error_msg)
         gpg = gnupg.GPG(gnupghome=self.config.homedir)
         passphrase = get_gpg_passphrase(
-            prompt=self.config.prompt_passphrase,
+            prompt=self.config.prompt_passwords,
             gpg=gpg,
-            recipient=self.config.asymmetric['signature_fingerprint'],
+            recipient=config['sign']['signature'],
             message="Enter your GPG passphrase for signing with fingerprint="
-                    f"'{self.config.asymmetric['signature_fingerprint']}'")
+                    f"'{config['sign']['signature']}'")
         message = gpg.sign(message_text,
-                           keyid=self.config.asymmetric['signature_fingerprint'],
+                           keyid=config['sign']['signature'],
                            passphrase=passphrase)
         del passphrase
         if message.status == 'signature created':
@@ -465,31 +557,32 @@ class CryptoEmail:
     def _test_connection(self, connection):
         logger.info(f"### Test connection with '{connection}' ###")
         result = Result()
-        if connection == 'googleapi':
-            self.config.send_emails['connection_method'] = connection
-            connection_type = self.config.send_emails['connection_method']
+        if connection == CONNECTIONS['tokens']:
+            self.config.connection_method = connection
+            connection_type = self.config.connection_method
             auth_config = getattr(self.config, connection_type)
             service = self._connect_with_tokens(
-                email_account=self.config.send_emails['sender_email_address'],
+                email_account=self.config.mailbox_address,
                 connection_type=connection_type,
-                credentials_path=auth_config['sender_auth']['credentials_path'],
-                scopes=auth_config['sender_auth']['scopes'])
+                credentials_path=auth_config['credentials_path'],
+                scopes=auth_config['scopes_for_sending'])
             logger.debug("Scopes: "
                          f"{service._rootDesc['auth']['oauth2']['scopes']['https://mail.google.com/']['description']}")
-        elif connection == 'smtp':
-            self.config.send_emails['connection_method'] = self.config.smtp
-            smtp_config = self.config.send_emails['connection_method']
+        elif connection == CONNECTIONS['password']:
+            self.config.connection_method = self.config.smtp_imap
+            smtp_config = self.config.connection_method
             password = self._get_email_password(
-                self.config.send_emails['sender_email_address'],
-                smtp_config['prompt_email_password'])
+                self.config.mailbox_address,
+                self.config.prompt_passwords)
             logger.info('Connecting to the smtp server...')
             with smtplib.SMTP(smtp_config['smtp_server'],
-                              smtp_config['tls_port']) as server:
+                              smtp_config['smtp_port']) as server:
                 retval = self._login_stmp(server, password)
                 result = retval if retval else result
         else:
             error_msg = f'Connection method not supported: {connection}\n'
             result.set_error(error_msg)
+            logger.error(error_msg)
         if not result.exit_code:
             logger.info('Connection successful!\n')
             result.set_success()
@@ -504,8 +597,8 @@ class CryptoEmail:
             encrypted_message = self._encrypt_message(plaintext_message)
         except ValueError as e:
             error_msg = "The email couldn't be encrypted with the " \
-                        "program {}\n{}\n".format(
-                            self.config.send_emails['encryption']['program'], e)
+                        "program '{}'\n{}\n".format(
+                            self.config.send_emails['encrypt']['program'], e)
             logger.error(error_msg)
             return result.set_error(error_msg)
         logger.info('')
@@ -542,7 +635,7 @@ class CryptoEmail:
             signed_message = self._sign_message(message)
         except ValueError as e:
             error_msg = "The message couldn't be " \
-                        "signed\n{}".format(e)
+                        "signed\n{}\n".format(e)
             logger.error(error_msg)
             result.set_error(error_msg)
             return result
@@ -559,7 +652,7 @@ class CryptoEmail:
             result.set_success()
         else:
             error_msg = "The message couldn't be " \
-                        "signed\n{}".format(verify.stderr)
+                        "signed\n{}\n".format(verify.stderr)
             logger.error(error_msg)
             result.set_error(error_msg)
         return result
@@ -695,100 +788,212 @@ def send_message(service, user_id, message):
         print('An error occurred: {}'.format(e))
 
 
+def init_list(list_):
+    return [] if list_ is None else list_
+
+
+class OptionsChecker:
+    def __init__(self, add_opts, remove_opts):
+        self.add_opts = init_list(add_opts)
+        self.remove_opts = init_list(remove_opts)
+
+    def check(self, opt_name):
+        return not self.remove_opts.count(opt_name) or \
+               self.add_opts.count(opt_name)
+
+
+def add_connection_options(parser, add_opts=None, remove_opts=None,
+                           title='Connection options'):
+    checker = OptionsChecker(add_opts, remove_opts)
+    connection_group = parser.add_argument_group(title=f"{yellow(title)}")
+    connection_group.add_argument(
+        '--mailbox', metavar='ADDRESS', dest='mailbox_address',
+        help='Mailbox address (e.g. my_email@address.com)')
+    if checker.check('conn'):
+        connection_group.add_argument(
+            '-c', '--connection', metavar='METHOD',
+            dest='connection_method', choices=CONNECTIONS.values(),
+            help='Connecting to an email server either with tokens '
+                 '(`googleapi`) or an email password (`smtp`).')
+
+
+def add_encryption_options(parser, add_opts=None, remove_opts=None,
+                           title='Encryption options'):
+    checker = OptionsChecker(add_opts, remove_opts)
+    encrypt_group = parser.add_argument_group(f"{yellow('Encryption options')}")
+    encrypt_group.add_argument(
+        '--recipient', metavar='USER-ID',
+        dest='send_emails.encrypt.recipient_userid',
+        help="Recipient to be used for encrypting the message.")
+    encrypt_group.add_argument(
+        '--sign', metavar='USER-ID',
+        help="The signature to be applied to the message.")
+    if checker.check('unencrypt'):
+        encrypt_group.add_argument(
+            '-u', '--unencrypt', action='store_true',
+            help="Don't encrypt the message.")
+
+
+# General options
+def add_general_options(parser, add_opts=None, remove_opts=None,
+                        program_version=cryptlib.__version__,
+                        title='General options'):
+    checker = OptionsChecker(add_opts, remove_opts)
+    parser_general_group = parser.add_argument_group(title=f"{yellow(title)}")
+    if checker.check('help'):
+        parser_general_group.add_argument('-h', '--help', action='help',
+                                          help='Show this help message and exit.')
+    if checker.check('version') and False:
+        parser_general_group.add_argument(
+            '-v', '--version', action='version',
+            version=f'{prog_name(__file__)} {program_version}',
+            help="Show program's version number and exit.")
+    if checker.check('quiet'):
+        parser_general_group.add_argument(
+            '-q', '--quiet', action='store_true',
+            help='Enable quiet mode, i.e. nothing will be printed.')
+    if checker.check('verbose'):
+        parser_general_group.add_argument(
+            '--verbose', action='store_true',
+            help='Print various debugging information, e.g. print traceback '
+                 'when there is an exception.')
+    if checker.check('log-level'):
+        parser_general_group.add_argument(
+            '-l', '--log-level', dest='logging_level',
+            choices=['debug', 'info', 'warning', 'error'],
+            help='Set logging level for all loggers. '
+                 + default(default_config.logging_level))
+    if checker.check('log-format'):
+        # TODO: explain each format
+        parser_general_group.add_argument(
+            '-f', '--log-format', dest='logging_formatter',
+            choices=['console', 'simple', 'only_msg'],
+            help='Set logging formatter for all loggers. '
+                 + default(default_config.logging_formatter))
+    if checker.check('interactive'):
+        parser_general_group.add_argument(
+            '-i', '--interactive', action='store_true',
+            help='Prompt the user to enter missing data from the configuration '
+                 'file (e.g. mailbox address)')
+    if checker.check('homedir'):
+        parser_general_group.add_argument(
+            '--homedir', metavar='PATH', dest='homedir',
+            help='Home directory where encryption keys are saved by the '
+                 'encryption program (e.g. GnuPG)')
+    return parser_general_group
+
+
+def add_googleapi_options(parser, title='googleapi options'):
+    googleapi_group = parser.add_argument_group(title=f'{yellow(title)}')
+    googleapi_group.add_argument(
+        '--creds', '--credentials', metavar='PATH',
+        dest='googleapi.credentials_path',
+        help="Path to the credentials file (JSON).")
+    googleapi_group.add_argument(
+        '--ss', '--scopes-sending', metavar='PATH', nargs='*',
+        dest='googleapi.scopes_for_sending',
+        help="Scopes applied when sending emails from gmail.com "
+             + default(default_config.googleapi['scopes_for_sending']))
+    googleapi_group.add_argument(
+        '--sr', '--scopes-reading', metavar='SCOPE', nargs='*',
+        dest='googleapi.scopes_for_reading',
+        help="Scopes applied when reading emails from gmail.com "
+             + default(default_config.googleapi['scopes_for_reading']))
+
+
+def add_smtp_imap_options(parser, title='smtp-imap options'):
+    smtp_imap_group = parser.add_argument_group(title=f'{yellow(title)}')
+    smtp_imap_group.add_argument(
+        '--smtp-port', metavar='PORT', type=int,
+        dest='smtp_imap.smtp_port',
+        help="SMTP port number. " + default(default_config.smtp_imap['smtp_port']))
+    smtp_imap_group.add_argument(
+        '--imap-port', metavar='PORT', type=int,
+        dest='smtp_imap.imap_port',
+        help="IMAP port number. " + default(default_config.smtp_imap['imap_port']))
+    smtp_imap_group.add_argument(
+        '--smtp-server', metavar='NAME',
+        dest='smtp_imap.smtp_server',
+        help="SMTP server name.")
+    smtp_imap_group.add_argument(
+        '--imap-server', metavar='NAME',
+        dest='smtp_imap.imap_server',
+        help="IMAP server name.")
+
+
 def setup_argparser():
     # Setup the parser
     width = os.get_terminal_size().columns - 5
     parser = argparse.ArgumentParser(
-        # usage="%(prog)s [OPTIONS]",
-        # prog=os.path.basename(__file__),
-        description='Command-line program for sending and reading encrypted '
-                    'emails.',
-        usage=usage(__file__),
+        usage=main_usage(__file__),
+        description="Command-line program for sending and reading "
+                    "encrypted emails.",
         add_help=False,
-        # ArgumentDefaultsHelpFormatter
-        # HelpFormatter
-        # RawDescriptionHelpFormatter
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
-    # ===============
-    # General options
-    # ===============
     general_group = parser.add_argument_group(f"{yellow('General options')}")
     general_group.add_argument('-h', '--help', action='help',
                                help='Show this help message and exit.')
     general_group.add_argument(
         '-v', '--version', action='version',
-        version=f'%(prog)s v{cryptlib.__version__}',
+        version=f'{prog_name(__file__)} v{cryptlib.__version__}',
         help="Show program's version number and exit.")
-    general_group.add_argument(
-        '-q', '--quiet', action='store_true',
-        help='Enable quiet mode, i.e. nothing will be printed.')
-    general_group.add_argument(
-        '--verbose', action='store_true',
-        help='Print various debugging information, e.g. print traceback '
-             'when there is an exception.')
-    general_group.add_argument(
-        '-l', '--log-level', dest='logging_level',
-        choices=['debug', 'info', 'warning', 'error'],
-        help='Set logging level for all loggers.'
-             + default(default_config.logging_level))
-    # TODO: explain each format
-    general_group.add_argument(
-        '-f', '--log-format', dest='logging_formatter',
-        choices=['console', 'simple', 'only_msg'],
-        help='Set logging formatter for all loggers.'
-             + default(default_config.logging_formatter))
-    """
-    general_group.add_argument(
-        '-i', '--inbox-address', metavar='ADDRESS',
-        dest='inbox_address',
-        help='Inbox address (e.g. my_email@address.com)')
-    """
-    # ===============
-    # Testing options
-    # ===============
-    testing_group = parser.add_argument_group(f"{yellow('Testing options')}")
-    testing_group.add_argument(
-        '--rt', '--run-cfg-tests', dest='run_tests', action='store_true',
-        help='Run a battery of tests as defined in the config file.')
-    testing_group.add_argument(
-        '--te', '--test-encryption', dest='args_test_encryption',
-        action='store_true',
-        help='Test encrypting and decrypting a message. The encryption program '
-             'used (e.g. GPG) is the one defined in the config file.')
-    testing_group.add_argument(
-        '--ts', '--test-signature', dest='args_test_signature',
-        action='store_true', help='Test signing a message.')
-    testing_group.add_argument(
-        '--tm', '--test-message', metavar='MESSAGE', dest='test_message',
-        default=default_config.test_message,
-        help='Message to be used for testing encryption or signing.'
-             + default(default_config.test_message))
-    testing_group.add_argument(
-        '--tc', '--test-connection', metavar='CONNECTION',
-        dest='args_test_connection', choices=['googleapi', 'smtp'],
-        help='Test connecting to an email server either with tokens '
-             '(`googleapi`) or an email password (`smtp`).')
+    # ===========
+    # Subcommands
+    # ===========
+    title = f"{yellow('Subcommands')}"
+    if sys.version_info >= (3, 7):
+        subparsers = parser.add_subparsers(
+            title=title, description=None, dest='subcommand', required=True,
+            help=None)
+    else:
+        # No arg 'required' supported for <= 3.6
+        # TODO: important, test without subcommand
+        subparsers = parser.add_subparsers(
+            title=title, description=None, dest='subcommand', help=None)
     # =================
     # Uninstall options
     # =================
-    # TODO: important, use subcommands
-    uninstall_group = parser.add_argument_group(f"{yellow('Uninstall options')}")
-    uninstall_group.add_argument(
+    # create the parser for the "uninstall" command
+    subcommand = 'uninstall'
+    desc = "Uninstall the `package` (including the program " \
+           f"'{prog_name(__file__)}') or `everything` (including config and " \
+           "log files)."
+    parser_test = subparsers.add_parser(
+        subcommand,
+        usage=subcomand_usage(__file__, subcommand),
+        description=desc,
+        add_help=False,
+        help='Uninstall the program.',
+        formatter_class=lambda prog: MyFormatter(
+            prog, max_help_position=50, width=width))
+    add_general_options(parser_test, remove_opts=['interactive', 'homedir'])
+    parser_uninstall_group = parser_test.add_argument_group(
+        title=f"{yellow('Uninstall options')}")
+    parser_uninstall_group.add_argument(
         '--uninstall', choices=['package', 'everything'],
-        help="Uninstall the `package` (including the program '{}') or "
-             "`everything` (including config and log files).".format(
-            prog_name(__file__)))
+        help=desc)
     # ============================
     # Edit cryptoemail config file
     # ============================
-    edit_group = parser.add_argument_group(
-        f"{yellow('Edit/reset the configuration file')}")
-    edit_mutual_group = edit_group.add_mutually_exclusive_group()
+    # create the parser for the "edit" command
+    subcommand = 'edit'
+    parser_test = subparsers.add_parser(
+        subcommand,
+        usage=subcomand_usage(__file__, subcommand),
+        description='Edit or reset the configuration file.',
+        add_help=False,
+        help='Edit/reset the configuration file.',
+        formatter_class=lambda prog: MyFormatter(
+            prog, max_help_position=50, width=width))
+    add_general_options(parser_test, remove_opts=['interactive', 'homedir'])
+    parser_edit_group = parser_test.add_argument_group(
+        title=f"{yellow('Edit/reset options')}")
+    edit_mutual_group = parser_edit_group.add_mutually_exclusive_group()
     edit_mutual_group.add_argument(
         '-e', '--edit', action='store_true',
         help=f'Edit the {prog_name(__file__)} configuration file.')
-    edit_group.add_argument(
+    edit_mutual_group.add_argument(
         '-a', '--app', dest='app',
         help='Name of the application to use for editing the '
              f'{prog_name(__file__)} configuration file. If no name is given, '
@@ -797,82 +1002,119 @@ def setup_argparser():
     edit_mutual_group.add_argument(
         '--reset', action='store_true',
         help=f'Reset the {prog_name(__file__)} configuration file to factory values.')
+    # ===============
+    # Testing options
+    # ===============
+    # create the parser for the "test" command
+    subcommand = 'test'
+    parser_test = subparsers.add_parser(
+        subcommand,
+        usage=subcomand_usage(__file__, subcommand),
+        description='Run tests as defined in the config file.',
+        add_help=False,
+        help='Run tests.',
+        formatter_class=lambda prog: MyFormatter(
+            prog, max_help_position=50, width=width))
+    add_general_options(parser_test)
+    add_connection_options(parser_test, remove_opts=['conn'])
+    add_googleapi_options(parser_test)
+    add_smtp_imap_options(parser_test)
+    add_encryption_options(parser_test, remove_opts=['unencrypt'])
+    parser_test_group = parser_test.add_argument_group(title=f"{yellow('Test options')}")
+    parser_test_group.add_argument(
+        '-r', '--run-tests', dest='run_tests', action='store_true',
+        help='Run a set of tests as defined in the config file.')
+    parser_test_group.add_argument(
+        '-e', '--encryption', dest='args_test_encryption',
+        action='store_true',
+        help='Test encrypting and decrypting a message. The encryption program '
+             'used (e.g. GPG) is the one defined in the config file.')
+    parser_test_group.add_argument(
+        '-s', '--signature', dest='args_test_signature',
+        action='store_true', help='Test signing a message.')
+    parser_test_group.add_argument(
+        '-m', '--message', metavar='MESSAGE', dest='test_message',
+        default=default_config.test_message,
+        help='Message to be used for testing encryption or signing. '
+             + default(default_config.test_message))
+    parser_test_group.add_argument(
+        '-c', '--connection', metavar='METHOD',
+        dest='args_test_connection', choices=CONNECTIONS.values(),
+        help="Test connecting to an email server either with tokens "
+             f"(`{CONNECTIONS['tokens']}`) or an email password "
+             f"(`{CONNECTIONS['password']}`).")
     # ===================
     # Send emails options
     # ===================
-    send_group = parser.add_argument_group(f"{yellow('Send options')}")
-    send_group.add_argument(
-        '-s', '--send', dest='send', action='store_true',
-        help="Send an encrypted email. The encryption applied is the one "
-             "defined in the config file.")
-    send_group.add_argument(
-        '-u', '--unencrypt', action='store_true',
-        help="Don't encrypt the email.")
-    send_group.add_argument(
-        '--recipient', metavar='USER-ID',
-        dest='asymmetric.recipient_fingerprint',
-        help="Recipient to be used for encrypting the message.")
-    send_group.add_argument(
-        '--sign', metavar='USER-ID', dest='asymmetric.signature_fingerprint',
-        help="Sign the email. The signature applied is the one defined in the "
-             "config file.")
-    send_group.add_argument('-m', '--email-message', metavar='STRING', nargs=2,
-                            help='The email subject and text.')
-    send_group.add_argument(
+    # create the parser for the "send" command
+    subcommand = 'send'
+    parser_send = subparsers.add_parser(
+        subcommand,
+        usage=subcomand_usage(__file__, subcommand),
+        description='Send a signed and/or encrypted email.',
+        add_help=False,
+        help='Send an encrypted email.',
+        formatter_class=lambda prog: MyFormatter(
+            prog, max_help_position=50, width=width))
+    add_general_options(parser_send)
+    add_connection_options(parser_send)
+    add_googleapi_options(parser_send)
+    add_smtp_imap_options(parser_send)
+    add_encryption_options(parser_send)
+    parser_send_group = parser_send.add_argument_group(title=f"{yellow('Send options')}")
+    parser_send_group.add_argument('-m', '--email-message', metavar='STRING', nargs=2,
+                                   help='The email subject and text.')
+    parser_send_group.add_argument(
         '-p', '--email-path', metavar='PATH',
         help='Path to a text file containing the email to be sent.')
-    send_group.add_argument(
-        '--sc', '--send-connection', metavar='CONNECTION',
-        dest='send_emails.connection_method', choices=['googleapi', 'smtp'],
-        help='Connecting to an email server for sending either with tokens '
-             '(`googleapi`) or an email password (`smtp`).')
-    send_group.add_argument(
-        '--sa', '--sender-address', metavar='ADDRESS',
-        dest='send_emails.sender_email_address',
-        help='Sender email address (e.g. sender@address.com)')
-    send_group.add_argument(
-        '--ra', '--receiver-address', metavar='ADDRESS',
+    parser_send_group.add_argument(
+        '-r', '--receiver-email', metavar='ADDRESS',
         dest='send_emails.receiver_email_address',
-        help='Receiver email address (e.g. receiver@address.com)')
+        help="Receiver's email address (e.g. receiver@address.com)")
     # ===================
     # Read emails options
     # ===================
-    read_group = parser.add_argument_group(f"{yellow('Read options')}")
-    read_group.add_argument(
-        '-r', '--read', dest='read',
-        action='store_true',
-        help='Read emails from your inbox which might contain '
-             'unencrypted and encrypted emails.')
-    read_group.add_argument(
-        '--rc', '--read-connection', metavar='CONNECTION',
-        dest='send_emails.connection_method', choices=['googleapi', 'smtp'],
-        help='Connecting to an email server for reading either with tokens '
-             '(`googleapi`) or an email password (`smtp`).')
-    read_group.add_argument(
-        '--reader-address', metavar='ADDRESS',
-        dest='read_emails.reader_email_address',
-        help='Reader email address (e.g. reader@address.com)')
+    # create the parser for the "read" command
+    subcommand = 'read'
+    parser_read = subparsers.add_parser(
+        subcommand,
+        usage=subcomand_usage(__file__, subcommand),
+        description='Read emails from your inbox which might contain '
+                    'unencrypted and encrypted emails.',
+        add_help=False,
+        help='Read your emails.',
+        formatter_class=lambda prog: MyFormatter(
+            prog, max_help_position=50, width=width))
+    add_general_options(parser_read)
+    add_connection_options(parser_read)
+    add_googleapi_options(parser_read)
+    add_smtp_imap_options(parser_read)
+    parser_read_group = parser_send.add_argument_group(title=f"{yellow('Read options')}")
     return parser
 
 
 def main():
     try:
         exit_code = 0
+        # Check project directory
+        mkdir(cryptlib.PROJECT_DIR)
+        mkdir(cryptlib.LOGS_DIR)
         # Parse command-line arguments
         parser = setup_argparser()
         args = parser.parse_args()
-        main_cfg = argparse.Namespace(**get_config_dict('main', PROJECT_DIR))
+        main_cfg = argparse.Namespace(**get_config_dict('main', cryptlib.PROJECT_DIR))
         # Override configuration dict with command-line arguments
         returned_values = override_config_with_args(main_cfg, args)
         setup_log(package='cryptlib',
                   script_name=prog_name(__file__),
-                  log_filepath=LOGGING_PATH,
+                  log_filepath=cryptlib.LOGGING_PATH,
                   quiet=main_cfg.quiet,
                   verbose=main_cfg.verbose,
                   logging_level=main_cfg.logging_level,
-                  logging_formatter=main_cfg.logging_formatter)
+                  logging_formatter=main_cfg.logging_formatter,
+                  handler_names=['console'])
         process_returned_values(returned_values)
-        if main_cfg.uninstall:
+        if main_cfg.subcommand == 'uninstall':
             logger.info('Uninstalling program ...')
         else:
             exit_code = CryptoEmail(main_cfg).run()
