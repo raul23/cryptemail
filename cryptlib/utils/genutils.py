@@ -20,7 +20,8 @@ logger = init_log(__name__, __file__)
 # TODO: is next necessary? already done in init_log
 logger.addHandler(NullHandler())
 
-CFG_TYPES = ['main', 'log']
+CFG_TYPES = {'main': {'default': 'default_config.py', 'user': 'config.py'},
+             'log': {'default': 'default_logging.py', 'user': 'logging.py'}}
 
 COLORS = {
     'GREEN': '\033[0;36m',  # 32
@@ -154,7 +155,7 @@ def load_cfg_dict(cfg_filepath, cfg_type):
         else:
             src = get_logging_filepath(configs_dirpath, default_config=True)
         shutil.copy(src, cfg_filepath)
-        print(f"Config file created: {cfg_filepath}")
+        # print(f"Config file created: {cfg_filepath}")
         cfg_dict = _load_cfg_dict(cfg_filepath, cfg_type)
     return cfg_dict
 
@@ -200,6 +201,17 @@ def load_json(filepath, encoding='utf8'):
         raise
     else:
         return data
+
+
+def mkdir(path):
+    # Since path can be relative to the cwd
+    path = os.path.abspath(path)
+    if os.path.exists(path):
+        logger.debug(f"Directory already exits: {path}")
+    else:
+        logger.debug(f"Creating directory '{path}'")
+        os.mkdir(path)
+        logger.info(f"Directory created: '{path}'")
 
 
 def override_config_with_args(main_config, args):
@@ -270,7 +282,8 @@ def prog_name(filename):
 
 def setup_log(package=None, script_name=None, log_filepath=None,
               configs_dirpath=None, quiet=False, verbose=False,
-              logging_level=None, logging_formatter=None, subcommand=None):
+              logging_level=None, logging_formatter=None, subcommand=None,
+              handler_names=None):
     if type(package) == str:
         package = importlib.import_module(package)
     package_path = os.getcwd()
@@ -282,13 +295,15 @@ def setup_log(package=None, script_name=None, log_filepath=None,
     if not quiet:
         if verbose:
             # verbose supercedes logging_level
-            set_logging_level(log_dict, level='DEBUG')
+            set_logging_level(log_dict, handler_names=handler_names, level='DEBUG')
         else:
             if logging_level:
                 logging_level = logging_level.upper()
-                set_logging_level(log_dict, level=logging_level)
+                set_logging_level(log_dict, handler_names=handler_names,
+                                  level=logging_level)
         if logging_formatter:
-            set_logging_formatter(log_dict, formatter=logging_formatter)
+            set_logging_formatter(log_dict, handler_names=handler_names,
+                                  formatter=logging_formatter)
         if subcommand:
             size_longest_name = max([len(key) for key in log_dict['loggers'].keys()])
             for log_name, _ in log_dict['loggers'].items():
@@ -326,21 +341,31 @@ def color(msg, msg_color='y', bold=False):
 
 
 def default(default_value):
-    msg = f"default: {default_value}"
-    return f" ({color(msg, 'g')})"
+    return green(f'(default: {default_value})')
 
 
-def usage(script_filename):
-    msg = f"{prog_name(script_filename)} [OPTIONS]"
-    return f"{color(msg, 'b')}"
+def main_usage(script_filename):
+    return blue(f'{prog_name(script_filename)} [-h] [-v] subcommands ...')
+
+
+def subcomand_usage(script_filename, subcommand):
+    return blue(f'{prog_name(script_filename)} {subcommand} [OPTIONS]')
+
+
+def blue(msg):
+    return color(msg, 'b')
+
+
+def green(msg):
+    return color(msg, 'g')
 
 
 def red(msg):
-    return f"{color(msg, 'r')}"
+    return color(msg, 'r')
 
 
 def yellow(msg):
-    return f"{color(msg)}"
+    return color(msg)
 
 
 # -------------------------------
@@ -353,21 +378,21 @@ def get_configs_dirpath():
 
 def get_logging_filepath(configs_dirpath=None, default_config=False):
     configs_dirpath = get_configs_dirpath() if configs_dirpath is None else configs_dirpath
-    if default_config and not os.path.exists(os.path.join(configs_dirpath, 'default_logging.py')):
+    if default_config and not os.path.exists(os.path.join(configs_dirpath, CFG_TYPES['log']['default'])):
         default_config = True
         configs_dirpath = get_configs_dirpath()
     if default_config:
-        return os.path.join(configs_dirpath, 'default_logging.py')
+        return os.path.join(configs_dirpath, CFG_TYPES['log']['default'])
     else:
-        return os.path.join(configs_dirpath, 'logging.py')
+        return os.path.join(configs_dirpath, CFG_TYPES['log']['user'])
 
 
 def get_main_config_filepath(configs_dirpath=None, default_config=False):
     configs_dirpath = get_configs_dirpath() if configs_dirpath is None else configs_dirpath
-    if default_config and not os.path.exists(os.path.join(configs_dirpath, 'default_config.py')):
+    if default_config and not os.path.exists(os.path.join(configs_dirpath, CFG_TYPES['main']['default'])):
         default_config = True
         configs_dirpath = get_configs_dirpath()
     if default_config:
-        return os.path.join(configs_dirpath, 'default_config.py')
+        return os.path.join(configs_dirpath, CFG_TYPES['main']['default'])
     else:
-        return os.path.join(configs_dirpath, 'config.py')
+        return os.path.join(configs_dirpath, CFG_TYPES['main']['user'])
