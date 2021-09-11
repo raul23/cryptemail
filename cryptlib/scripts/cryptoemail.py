@@ -43,105 +43,21 @@ class CryptoEmail:
         self.tester = Tester()
         self._missing_data = False
 
-    def _interact(self):
-        if (self.config.run_tests and (self.config.test_encryption or self.config.test_signature)) or \
-                self.config.args_test_encryption or self.config.args_test_signature \
-                or self.config.subcommand in ['send', 'read']:
-            if self.config.homedir == default_config.homedir:
-                self.config.homedir = self._input('homedir: ', is_path=True)
-        if (self.config.run_tests and self.config.test_encryption) or self.config.args_test_encryption or \
-                (self.config.subcommand == 'send' and self.config.send_emails['encrypt']['enable_encryption']):
-            if self.config.send_emails['encrypt']['recipient_userid'] == \
-                    default_config.send_emails['encrypt']['recipient_userid']:
-                self.config.send_emails['encrypt']['recipient_userid'] = self._input('recipient_userid: ', is_userid=True)
-        if ((self.config.run_tests and self.config.test_signature) or self.config.args_test_signature or
-                (self.config.subcommand == 'send' and self.config.send_emails['sign']['enable_signature'])):
-            if self.config.send_emails['sign']['signature'] == default_config.send_emails['sign']['signature']:
-                self.config.send_emails['sign']['signature'] = self._input('signature: ', is_userid=True)
-        if (self.config.run_tests and self.config.test_connection) or \
-                self.config.args_test_connection or self.config.subcommand in ['send', 'read']:
-            if self.config.mailbox_address == default_config.mailbox_address:
-                self.config.mailbox_address = self._input('mailbox_address: ', is_address=True)
-            if ((self.config.subcommand in ['send', 'read']) and self.config.connection_method == 'googleapi') \
-                    or (self.config.run_tests and
-                        self.config.test_connection == 'googleapi') or \
-                    self.config.args_test_connection == 'googleapi':
-                if self.config.googleapi['credentials_path'] \
-                        == default_config.googleapi['credentials_path']:
-                    self.config.googleapi['credentials_path'] = \
-                        self._input('credentials_path: ', is_path=True)
-            if (self.config.subcommand == 'send' and self.config.connection_method == 'smtp_imap')  \
-                    or (self.config.run_tests and
-                        self.config.test_connection == 'smtp_imap') or \
-                    self.config.args_test_connection == 'smtp_imap':
-                if self.config.smtp_imap['smtp_server'] \
-                        == default_config.smtp_imap['smtp_server']:
-                    self.config.smtp_imap['smtp_server'] = \
-                        self._input('smtp_server: ', is_server=True)
-            if self.config.subcommand == 'read' and self.config.connection_method == 'smtp_imap':
-                if self.config.smtp_imap['imap_server'] \
-                        == default_config.smtp_imap['imap_server']:
-                    self.config.smtp_imap['imap_server'] = \
-                        self._input('imap_server: ', is_server=True)
-            if self.config.subcommand == 'send':
-                if self.config.send_emails['receiver_email_address'] \
-                        == default_config.send_emails['receiver_email_address']:
-                    self.config.send_emails['receiver_email_address'] = \
-                        self._input('(Receiver) email_address: ', is_address=True)
-        if self._missing_data:
-            print('')
-        self._missing_data = False
-
-    def _input(self, prompt, values=None, lower=False, is_path=False,
-               is_userid=False, is_address=False, is_server=False):
-        if not self._missing_data:
-            print('\nEnter the following data')
-            self._missing_data = True
-        while True:
-            ans = input(prompt)
-            ans = ans.lower() if lower else ans
-            if values:
-                if ans in values:
-                    return ans
-                else:
-                    print('Invalid value!')
-            elif is_path:
-                ans = os.path.expanduser(ans)
-                if os.path.exists(ans):
-                    return ans
-                else:
-                    print("Path doesn't exist!")
-            elif is_userid:
-                if os.path.exists(self.config.homedir):
-                    gpg = gnupg.GPG(gnupghome=self.config.homedir)
-                    if self._fingerprint_exists(ans, gpg):
-                        return ans
-                    else:
-                        print("userid not found!")
-                else:
-                    return ans
-            elif is_address:
-                if self._is_valid_email(ans):
-                    return ans
-                else:
-                    print("Invalid address!")
-            elif is_server:
-                if self._is_valid_servername(ans):
-                    return ans
-                else:
-                    print("Invalid server name!")
-
     def run(self):
         if self.config.interactive:
             self._interact()
         # ===========
         # Subcommands
         # ===========
-        if self.config.subcommand == 'send':
-            self._get_message()
-            return self._send_email().exit_code
-        if self.config.subcommand == 'read':
-            return self._read_emails()
+        try:
+            if self.config.subcommand == 'send':
+                self._get_message()
+                return self._send_email().exit_code
+            if self.config.subcommand == 'read':
+                return self._read_emails()
+        except Exception as e:
+            self._log_error(e)
+            return 1
         if self.config.subcommand == 'test':
             if self.config.run_tests:
                 self._run_tests()
@@ -153,10 +69,24 @@ class CryptoEmail:
                 if self.config.args_test_connection:
                     self._test_connection(self.config.args_test_connection)
             if self.tester.n_tests:
-                logger.info('### Test results ###')
-                logger.info('Success rate: {}/{} = {}%\n'.format(
+                logger.info(blue('### Test results ###'))
+                logger.info('Success rate: {}/{} = {}%'.format(
                     self.tester.n_success, self.tester.n_tests,
                     int(self.tester.success_rate * 100)))
+                logger.info('')
+                success_msg = ''
+                fail_msg = ''
+                for test_name, result in self.tester.report.items():
+                    if result.exit_code == 0:
+                        success_msg += f'- {test_name}\n'
+                    elif result.exit_code > 0:
+                        fail_msg += f'- {test_name}: {result.error_msg.splitlines()[0]}\n'
+                if fail_msg:
+                    success_msg = success_msg.strip()
+                if success_msg:
+                    logger.info(f"{green('Successful tests:')}\n{success_msg}")
+                if fail_msg:
+                    logger.info(f"{red('Failed tests:')}\n{fail_msg}")
             else:
                 logger.info('No tests!')
         return 0
@@ -173,6 +103,15 @@ class CryptoEmail:
             logger.debug('enable_signature = True')
             self.config.send_emails['sign']['enable_signature'] = True
             self.config.send_emails['sign']['signature'] = self.config.sign
+        if self.config.verbose:
+            logger.debug('logging_level = True')
+            self.config.logging_level = 'debug'
+        opts = ['run_tests', 'args_test_encryption', 'args_test_connection',
+                'args_test_signature']
+        for opt in opts:
+            if getattr(self.config, opt, None) is None:
+                logger.debug(f'{opt} = None')
+                setattr(self.config, opt, None)
 
     def _check_config(self, config):
         for k, v in config.items():
@@ -183,31 +122,6 @@ class CryptoEmail:
             if not (k.startswith('__') and k.endswith('__')):
                 if k == 'homedir' or k.endswith('path'):
                     config[k] = os.path.expanduser(v)
-
-    @staticmethod
-    def _is_valid_email(email):
-        regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        if re.fullmatch(regex, email):
-            return 1
-        else:
-            return 0
-
-    @staticmethod
-    def _is_valid_servername(servername):
-        regex = r'\b(smtp|imap)\.[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        if re.fullmatch(regex, servername):
-            return 1
-        else:
-            return 0
-
-    @staticmethod
-    def _fingerprint_exists(fingerprint, gpg):
-        logger.debug("Checking fingerprint='{}' ...".format(fingerprint))
-        if fingerprint not in gpg.list_keys().fingerprints:
-            logger.debug("The fingerprint='{}' was not found in the "
-                         "keyring".format(fingerprint))
-            return 0
-        return 1
 
     @staticmethod
     def _check_gnupghome(gnupghome):
@@ -314,6 +228,15 @@ class CryptoEmail:
             raise NotImplementedError('Only GPG supported!')
         return encrypted_msg
 
+    @staticmethod
+    def _fingerprint_exists(fingerprint, gpg):
+        logger.debug("Checking fingerprint='{}' ...".format(fingerprint))
+        if fingerprint not in gpg.list_keys().fingerprints:
+            logger.debug("The fingerprint='{}' was not found in the "
+                         "keyring".format(fingerprint))
+            return 0
+        return 1
+
     # TODO: important, implement it
     def _get_email_password(self, email_account, prompt=False):
         password = None
@@ -352,6 +275,123 @@ class CryptoEmail:
                 logger.debug(f"Removing 'Subject:' from '{self.subject}'")
                 self.subject = self.subject[len('Subject:'):].strip()
 
+    def _input(self, prompt, values=None, lower=False, is_path=False,
+               is_userid=False, is_address=False, is_server=False):
+        if not self._missing_data:
+            print('\nEnter the following data')
+            self._missing_data = True
+        while True:
+            ans = input(prompt)
+            ans = ans.lower() if lower else ans
+            if values:
+                if ans in values:
+                    return ans
+                else:
+                    print('Invalid value!')
+            elif is_path:
+                ans = os.path.expanduser(ans)
+                if os.path.exists(ans):
+                    return ans
+                else:
+                    print("Path doesn't exist!")
+            elif is_userid:
+                if os.path.exists(self.config.homedir):
+                    gpg = gnupg.GPG(gnupghome=self.config.homedir)
+                    if self._fingerprint_exists(ans, gpg):
+                        return ans
+                    else:
+                        print("userid not found!")
+                else:
+                    return ans
+            elif is_address:
+                if self._is_valid_email(ans):
+                    return ans
+                else:
+                    print("Invalid address!")
+            elif is_server:
+                if self._is_valid_servername(ans):
+                    return ans
+                else:
+                    print("Invalid server name!")
+
+    def _interact(self):
+        if (self.config.run_tests and (self.config.test_encryption or self.config.test_signature)) or \
+                self.config.args_test_encryption or self.config.args_test_signature \
+                or self.config.subcommand in ['send', 'read']:
+            if self.config.subcommand == 'send' and \
+                    (not self.config.send_emails['encrypt']['enable_encryption']
+                     or not self.config.send_emails['sign']['enable_signature']):
+                logger.debug('homedir not necessary')
+            elif self.config.homedir == default_config.homedir:
+                self.config.homedir = self._input('homedir: ', is_path=True)
+        if (self.config.run_tests and self.config.test_encryption) or self.config.args_test_encryption or \
+                (self.config.subcommand == 'send' and self.config.send_emails['encrypt']['enable_encryption']):
+            if self.config.send_emails['encrypt']['recipient_userid'] == \
+                    default_config.send_emails['encrypt']['recipient_userid']:
+                self.config.send_emails['encrypt']['recipient_userid'] = self._input('recipient_userid: ', is_userid=True)
+        if ((self.config.run_tests and self.config.test_signature) or self.config.args_test_signature or
+                (self.config.subcommand == 'send' and self.config.send_emails['sign']['enable_signature'])):
+            if self.config.send_emails['sign']['signature'] == default_config.send_emails['sign']['signature']:
+                self.config.send_emails['sign']['signature'] = self._input('signature: ', is_userid=True)
+        if (self.config.run_tests and self.config.test_connection) or \
+                self.config.args_test_connection or self.config.subcommand in ['send', 'read']:
+            if self.config.mailbox_address == default_config.mailbox_address:
+                self.config.mailbox_address = self._input('mailbox_address: ', is_address=True)
+            if ((self.config.subcommand in ['send', 'read']) and self.config.connection_method == 'googleapi') \
+                    or (self.config.run_tests and
+                        self.config.test_connection == 'googleapi') or \
+                    self.config.args_test_connection == 'googleapi':
+                if self.config.googleapi['credentials_path'] \
+                        == default_config.googleapi['credentials_path']:
+                    self.config.googleapi['credentials_path'] = \
+                        self._input('credentials_path: ', is_path=True)
+            if (self.config.subcommand == 'send' and self.config.connection_method == 'smtp_imap')  \
+                    or (self.config.run_tests and
+                        self.config.test_connection == 'smtp_imap') or \
+                    self.config.args_test_connection == 'smtp_imap':
+                if self.config.smtp_imap['smtp_server'] \
+                        == default_config.smtp_imap['smtp_server']:
+                    self.config.smtp_imap['smtp_server'] = \
+                        self._input('smtp_server: ', is_server=True)
+            if self.config.subcommand == 'read' and self.config.connection_method == 'smtp_imap':
+                if self.config.smtp_imap['imap_server'] \
+                        == default_config.smtp_imap['imap_server']:
+                    self.config.smtp_imap['imap_server'] = \
+                        self._input('imap_server: ', is_server=True)
+            if self.config.subcommand == 'send':
+                if self.config.send_emails['receiver_email_address'] \
+                        == default_config.send_emails['receiver_email_address']:
+                    self.config.send_emails['receiver_email_address'] = \
+                        self._input('(Receiver) email_address: ', is_address=True)
+        if self._missing_data:
+            print('')
+            self._missing_data = False
+
+    @staticmethod
+    def _is_valid_email(email):
+        regex = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        if re.fullmatch(regex, email):
+            return 1
+        else:
+            return 0
+
+    @staticmethod
+    def _is_valid_servername(servername):
+        regex = r'\b(smtp|imap)\.[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        if re.fullmatch(regex, servername):
+            return 1
+        else:
+            return 0
+
+    def _log_error(self, error, nl=False):
+        if self.config.verbose:
+            error_msg = f'{traceback.format_exc()}'.strip()
+        else:
+            error_msg = red(error.__str__())
+        if nl:
+            error_msg = error_msg + '\n'
+        logger.error(red(f'{error_msg}'))
+
     def _login_stmp(self, server, password):
         result = Result()
         context = ssl.create_default_context()
@@ -366,8 +406,8 @@ class CryptoEmail:
         except smtplib.SMTPAuthenticationError as e:
             error_msg = "Login to '{}' failed".format(
                 self.config.mailbox_address)
-            logger.error(e)
-            logger.warning(error_msg + '\n')
+            logger.warning(yellow(error_msg))
+            self._log_error(e, nl=True)
             return result.set_error(error_msg)
         else:
             return 0
@@ -510,8 +550,8 @@ class CryptoEmail:
     def _sign_message(self, message_text):
         config = self.config.send_emails
         if config['sign']['program'] == 'GPG':
-            logger.info("Signing message (recipient='{}') ...".format(
-                config['encrypt']['recipient_userid']))
+            logger.info("Signing message (signature='{}') ...".format(
+                config['sign']['signature']))
         else:
             error_msg = "Signature program not supported: " \
                         "{}\n".format(config['sign']['program'])
@@ -544,10 +584,8 @@ class CryptoEmail:
                     result = func(*args, **kwargs)
                 except Exception as e:
                     result = Result()
-                    # TODO: logger.error(e) if no traceback to be shown
-                    error_msg = f'{traceback.format_exc()}'.strip()
-                    logger.error(f'{error_msg}\n')
-                    result.set_error(e)
+                    self._log_error(e, nl=True)
+                    result.set_error(e.__str__())
                 self.tester.update_report(test_type=test_type, result=result)
                 return result
             return wrapped_function
@@ -555,7 +593,7 @@ class CryptoEmail:
 
     @_update_report('testing connection')
     def _test_connection(self, connection):
-        logger.info(f"### Test connection with '{connection}' ###")
+        logger.info(blue(f"### Test connection with '{connection}' ###"))
         result = Result()
         if connection == CONNECTIONS['tokens']:
             self.config.connection_method = connection
@@ -574,7 +612,7 @@ class CryptoEmail:
             password = self._get_email_password(
                 self.config.mailbox_address,
                 self.config.prompt_passwords)
-            logger.info('Connecting to the smtp server...')
+            logger.info(f"Connecting to the smtp server '{smtp_config['smtp_server']}'...")
             with smtplib.SMTP(smtp_config['smtp_server'],
                               smtp_config['smtp_port']) as server:
                 retval = self._login_stmp(server, password)
@@ -582,24 +620,24 @@ class CryptoEmail:
         else:
             error_msg = f'Connection method not supported: {connection}\n'
             result.set_error(error_msg)
-            logger.error(error_msg)
+            logger.error(red(error_msg))
         if not result.exit_code:
-            logger.info('Connection successful!\n')
+            logger.info(green('Connection successful!\n'))
             result.set_success()
         return result
 
     @_update_report('testing encryption/decryption')
     def _test_encryption(self, plaintext_message):
-        logger.info('### Test encryption/decryption ###')
+        logger.info(blue('### Test encryption/decryption ###'))
         result = Result()
         logger.info('Plaintext message: {}'.format(plaintext_message))
         try:
             encrypted_message = self._encrypt_message(plaintext_message)
         except ValueError as e:
-            error_msg = "The email couldn't be encrypted with the " \
+            error_msg = "The message couldn't be encrypted with the " \
                         "program '{}'\n{}\n".format(
                             self.config.send_emails['encrypt']['program'], e)
-            logger.error(error_msg)
+            logger.error(red(error_msg))
             return result.set_error(error_msg)
         logger.info('')
         logger.info('## Encryption results ##')
@@ -617,25 +655,25 @@ class CryptoEmail:
         logger.debug('Encrypted message:\n{}'.format(str(encrypted_message)))
         logger.info('Decrypted message: {}'.format(decrypted_message.data.decode()))
         if plaintext_message == decrypted_message.data.decode():
-            logger.info('Encryption/decryption successful!\n')
+            logger.info(green('Encryption/decryption successful!\n'))
             result.set_success()
         else:
             error_msg = "The message couldn't be decrypted " \
                         "correctly\n{}".format(decrypted_message.stderr)
-            logger.error(error_msg)
+            logger.error(red(error_msg))
             result.set_error(error_msg)
         return result
 
     @_update_report('testing signing')
     def _test_signature(self, message):
-        logger.info('### Test message signing ###')
+        logger.info(blue('### Test message signing ###'))
         result = Result()
         logger.info('Message to be signed: {}'.format(message))
         try:
             signed_message = self._sign_message(message)
         except ValueError as e:
             error_msg = "The message couldn't be " \
-                        "signed\n{}\n".format(e)
+                        "signed\n{}\n".format(e.__str__().strip())
             logger.error(error_msg)
             result.set_error(error_msg)
             return result
@@ -647,13 +685,20 @@ class CryptoEmail:
         logger.info('status: {}'.format(verify.status))
         logger.debug('stderr:\n{}'.format(verify.stderr))
         logger.info('')
-        if verify.valid:
-            logger.info('Signing message successful!\n')
+        if verify.fingerprint != self.config.send_emails['sign']['signature']:
+            error_msg = 'The fingerprint used for signing ' \
+                        f'({verify.fingerprint}) is different from the one in ' \
+                        'the config ' \
+                        f"({self.config.send_emails['sign']['signature']})\n"
+            logger.error(red(error_msg))
+            result.set_error(error_msg)
+        elif verify.valid:
+            logger.info(green('Signing message successful!\n'))
             result.set_success()
         else:
             error_msg = "The message couldn't be " \
                         "signed\n{}\n".format(verify.stderr)
-            logger.error(error_msg)
+            logger.error(red(error_msg))
             result.set_error(error_msg)
         return result
 
@@ -691,13 +736,13 @@ class Tester:
 
     def update_tests(self, test_type):
         self.n_tests += 1
-        self.n_fails += 1 if self.report[test_type][-1].exit_code == 1 else 0
+        # TODO: exit_code >= 1
+        self.n_fails += 1 if self.report[test_type].exit_code >= 1 else 0
         self.n_success = self.n_tests - self.n_fails
         self.success_rate = self.n_success / self.n_tests
 
     def update_report(self, test_type, result):
-        self.report.setdefault(test_type, [])
-        self.report[test_type].append(result)
+        self.report.setdefault(test_type, result)
         self.update_tests(test_type)
 
 
@@ -832,6 +877,12 @@ def add_encryption_options(parser, add_opts=None, remove_opts=None,
         encrypt_group.add_argument(
             '-u', '--unencrypt', action='store_true',
             help="Don't encrypt the message.")
+    if checker.check('use-single-pass'):
+        encrypt_group.add_argument(
+            '--usp', '--use-single-pass', action='store_true',
+            dest='send_emails.use_single_pass',
+            help="Sign and encrypt in a single pass. Otherwise, sign first "
+                 "and then encrypt as separate processes.")
 
 
 # General options
@@ -870,16 +921,21 @@ def add_general_options(parser, add_opts=None, remove_opts=None,
             choices=['console', 'simple', 'only_msg'],
             help='Set logging formatter for all loggers. '
                  + default(default_config.logging_formatter))
-    if checker.check('interactive'):
-        parser_general_group.add_argument(
-            '-i', '--interactive', action='store_true',
-            help='Prompt the user to enter missing data from the configuration '
-                 'file (e.g. mailbox address)')
     if checker.check('homedir'):
         parser_general_group.add_argument(
             '--homedir', metavar='PATH', dest='homedir',
             help='Home directory where encryption keys are saved by the '
                  'encryption program (e.g. GnuPG)')
+    if checker.check('interactive'):
+        parser_general_group.add_argument(
+            '-i', '--interactive', action='store_true',
+            help='Prompt the user to enter missing data from the configuration '
+                 'file (e.g. mailbox address)')
+    if checker.check('prompt_passwords'):
+        parser_general_group.add_argument(
+            '--pp', '--prompt-passwords', dest='prompt_passwords',
+            action='store_true',
+            help='Prompt users to enter their email passwords or passphrases.')
     return parser_general_group
 
 
@@ -1104,7 +1160,7 @@ def main():
         args = parser.parse_args()
         main_cfg = argparse.Namespace(**get_config_dict('main', cryptlib.PROJECT_DIR))
         # Override configuration dict with command-line arguments
-        returned_values = override_config_with_args(main_cfg, args)
+        returned_values = override_config_with_args(main_cfg, get_config_dict('main'), args)
         setup_log(package='cryptlib',
                   script_name=prog_name(__file__),
                   log_filepath=cryptlib.LOGGING_PATH,
