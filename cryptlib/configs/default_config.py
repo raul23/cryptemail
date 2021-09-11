@@ -92,7 +92,7 @@ test_encryption = True
 test_signature = True
 
 # Message to be used for testing encryption or signing
-test_message = "Hello, World!"
+test_message = "Hellos, World!"
 
 # Test connection to an email server either through googleapi, smtp_imap or None
 # If None, then no connection testing will done
