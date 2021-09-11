@@ -214,7 +214,7 @@ def mkdir(path):
         logger.info(f"Directory created: '{path}'")
 
 
-def override_config_with_args(main_config, args):
+def override_config_with_args(main_config, default_main_config, args):
 
     def process_user_args():
 
@@ -223,13 +223,17 @@ def override_config_with_args(main_config, args):
                 if use_config:
                     keys = opt_name.split('.')
                     opt_val = cfg_dict
-                    for k in keys:
-                        opt_val = opt_val[k]
+                    try:
+                        for k in keys:
+                            opt_val = opt_val[k]
+                    except KeyError:
+                        logger.debug(f"The option '{opt_name}' couldn't be "
+                                     "found in the configuration file")
+                    else:
+                        return opt_val
                 else:
-                    opt_val = cfg_dict[opt_name]
-            else:
-                opt_val = cfg_dict.get(opt_name, 'not_found')
-            return opt_val
+                    return cfg_dict[opt_name]
+            return cfg_dict.get(opt_name, 'not_found')
 
         def set_opt_val(opt_name, opt_val, cfg_dict):
             if opt_name.find('.') != -1:
@@ -262,11 +266,23 @@ def override_config_with_args(main_config, args):
                 if config_val == 'not_found':
                     logger.debug("No value could be found for the "
                                  f"argument '{arg_name}'")
-                    set_opt_val(arg_name, arg_val, main_config)
-                    results.args_not_found_in_config.append((arg_name, config_val, arg_val))
+                    default_config_val = get_opt_val(arg_name, default_main_config, use_config=True)
+                    if default_config_val == 'not_found':
+                        set_opt_val(arg_name, arg_val, main_config)
+                        results.args_not_found_in_config.append((arg_name, config_val, arg_val))
+                    else:
+                        set_opt_val(arg_name, default_config_val, main_config)
+                        results.args_not_found_in_config.append((arg_name, config_val, default_config_val))
 
-    main_config = vars(main_config)
-    args = args.__dict__
+    def _get_dict(cfg):
+        if isinstance(cfg, argparse.Namespace):
+            # cfg = cfg.__dict__
+            cfg = vars(cfg)
+        return cfg
+
+    main_config = _get_dict(main_config)
+    default_main_config = _get_dict(default_main_config)
+    args = _get_dict(args)
     results = namedtuple("results", "args_not_found_in_config config_opts_overridden")
     results.args_not_found_in_config = []
     results.config_opts_overridden = []
