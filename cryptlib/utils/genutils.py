@@ -299,7 +299,7 @@ def prog_name(filename):
 def setup_log(package=None, script_name=None, log_filepath=None,
               configs_dirpath=None, quiet=False, verbose=False,
               logging_level=None, logging_formatter=None, subcommand=None,
-              handler_names=None):
+              level_handler_names=None, formater_handler_names=None):
     if type(package) == str:
         package = importlib.import_module(package)
     package_path = os.getcwd()
@@ -311,14 +311,14 @@ def setup_log(package=None, script_name=None, log_filepath=None,
     if not quiet:
         if verbose:
             # verbose supercedes logging_level
-            set_logging_level(log_dict, handler_names=handler_names, level='DEBUG')
+            set_logging_level(log_dict, handler_names=level_handler_names, level='DEBUG')
         else:
             if logging_level:
                 logging_level = logging_level.upper()
-                set_logging_level(log_dict, handler_names=handler_names,
+                set_logging_level(log_dict, handler_names=level_handler_names,
                                   level=logging_level)
         if logging_formatter:
-            set_logging_formatter(log_dict, handler_names=handler_names,
+            set_logging_formatter(log_dict, handler_names=formater_handler_names,
                                   formatter=logging_formatter)
         if subcommand:
             size_longest_name = max([len(key) for key in log_dict['loggers'].keys()])
@@ -361,10 +361,10 @@ def default(default_value):
 
 
 def main_usage(script_filename):
-    return blue(f'{prog_name(script_filename)} [-h] [-v] subcommands ...')
+    return blue(f'{prog_name(script_filename)} [-h] [-v] subcommand ...')
 
 
-def subcomand_usage(script_filename, subcommand):
+def subcommand_usage(script_filename, subcommand):
     return blue(f'{prog_name(script_filename)} {subcommand} [OPTIONS]')
 
 

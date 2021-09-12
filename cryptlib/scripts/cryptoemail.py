@@ -23,13 +23,17 @@ from google.oauth2.credentials import Credentials
 import cryptlib
 from cryptlib.configs import default_config
 from cryptlib.utils.genutils import *
+from cryptlib.utils.logutils import Logger
 
-logger = init_log(__name__, __file__)
+# logger = init_log(__name__, __file__)
 # Change logging level for googleapiclient and gnupg loggers
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 logging.getLogger('gnupg').setLevel(logging.ERROR)
 
 CONNECTIONS = {'tokens': 'googleapi', 'password': 'smtp_imap'}
+
+
+logger = Logger(__name__, __file__)
 
 
 class CryptoEmail:
@@ -51,7 +55,6 @@ class CryptoEmail:
         # ===========
         try:
             if self.config.subcommand == 'send':
-                self._get_message()
                 return self._send_email().exit_code
             if self.config.subcommand == 'read':
                 return self._read_emails()
@@ -335,7 +338,9 @@ class CryptoEmail:
                 self.config.send_emails['sign']['signature'] = self._input('signature: ', is_userid=True)
         if (self.config.run_tests and self.config.test_connection) or \
                 self.config.args_test_connection or self.config.subcommand in ['send', 'read']:
-            if self.config.mailbox_address == default_config.mailbox_address:
+            if self.config.connection_method == 'googleapi' and False:
+                logger.debug("mailbox_address not necessary since 'connection_method=googleapi'")
+            elif self.config.mailbox_address == default_config.mailbox_address:
                 self.config.mailbox_address = self._input('mailbox_address: ', is_address=True)
             if ((self.config.subcommand in ['send', 'read']) and self.config.connection_method == 'googleapi') \
                     or (self.config.run_tests and
@@ -386,6 +391,8 @@ class CryptoEmail:
     def _log_error(self, error, nl=False):
         if self.config.verbose:
             error_msg = f'{traceback.format_exc()}'.strip()
+            if error.__str__() not in error_msg:
+                error_msg += f'\n{error}'
         else:
             error_msg = red(error.__str__())
         if nl:
@@ -427,6 +434,7 @@ class CryptoEmail:
         logger.info('End tests from config file\n')
 
     def _send_email(self):
+        self._get_message()
         self._check_subject_and_text(self.subject, self.original_message_text)
         message_text = self.original_message_text
         config = self.config.send_emails
@@ -461,9 +469,9 @@ class CryptoEmail:
                 message_text = str(encrypted_message)
             except ValueError as e:
                 error_msg = "The email couldn't be encrypted with the " \
-                            "program {}\n{}\n".format(
+                            "program {}\n{}".format(
                                 config['encrypt']['program'], e)
-                logger.error(error_msg)
+                self._log_error(error_msg)
                 return result.set_error(error_msg)
         else:
             logger.info('No encryption will be applied on the email')
@@ -496,7 +504,7 @@ class CryptoEmail:
                         "email can't be sent."
             logger.error(error_msg + '\n')
             return result.set_error(error_msg)
-        logger.info('Connecting to the smtp server...')
+        logger.info(f"Connecting to the smtp server '{smtp_config['smtp_server']}'...")
         with smtplib.SMTP(smtp_config['smtp_server'],
                           smtp_config['smtp_port']) as server:
             retval = self._login_stmp(server, password)
@@ -509,7 +517,7 @@ class CryptoEmail:
             logger.info('Sending email...')
             server.sendmail(self.config.mailbox_address,
                             config['receiver_email_address'], message)
-            logger.info('Message sent!\n')
+            logger.info(green('Message sent!'))
         return result.set_success()
 
     def _send_email_with_tokens(self, message_text):
@@ -534,16 +542,16 @@ class CryptoEmail:
         if result_send is None:
             error_msg = "send_message() returned None. Thus, email couldn't " \
                         "be sent"
-            logger.error(error_msg + '\n')
+            self._log_error(error_msg)
             return result.set_error(error_msg)
         elif result_send.get('id') and 'SENT' in result_send.get('labelIds', []):
-            logger.info('Message sent!\n')
+            logger.info(green('Message sent!'))
             return result.set_success()
         else:
             error_msg = "Couldn't find SENT in labelIds. Thus, message " \
                         f"(ID='{result_send.get('id', 'None')}') couldn't be " \
                         "sent"
-            logger.error(error_msg + '\n')
+            self._log_error(error_msg)
             return result.set_error(error_msg)
 
     # TODO: provide signature fingerprint as param?
@@ -882,7 +890,7 @@ def add_encryption_options(parser, add_opts=None, remove_opts=None,
             '--usp', '--use-single-pass', action='store_true',
             dest='send_emails.use_single_pass',
             help="Sign and encrypt in a single pass. Otherwise, sign first "
-                 "and then encrypt as separate processes.")
+                 "and then encrypt as separate steps.")
 
 
 # General options
@@ -1017,7 +1025,7 @@ def setup_argparser():
            "log files)."
     parser_test = subparsers.add_parser(
         subcommand,
-        usage=subcomand_usage(__file__, subcommand),
+        usage=subcommand_usage(__file__, subcommand),
         description=desc,
         add_help=False,
         help='Uninstall the program.',
@@ -1036,7 +1044,7 @@ def setup_argparser():
     subcommand = 'edit'
     parser_test = subparsers.add_parser(
         subcommand,
-        usage=subcomand_usage(__file__, subcommand),
+        usage=subcommand_usage(__file__, subcommand),
         description='Edit or reset the configuration file.',
         add_help=False,
         help='Edit/reset the configuration file.',
@@ -1065,7 +1073,7 @@ def setup_argparser():
     subcommand = 'test'
     parser_test = subparsers.add_parser(
         subcommand,
-        usage=subcomand_usage(__file__, subcommand),
+        usage=subcommand_usage(__file__, subcommand),
         description='Run tests as defined in the config file.',
         add_help=False,
         help='Run tests.',
@@ -1106,7 +1114,7 @@ def setup_argparser():
     subcommand = 'send'
     parser_send = subparsers.add_parser(
         subcommand,
-        usage=subcomand_usage(__file__, subcommand),
+        usage=subcommand_usage(__file__, subcommand),
         description='Send a signed and/or encrypted email.',
         add_help=False,
         help='Send an encrypted email.',
@@ -1134,7 +1142,7 @@ def setup_argparser():
     subcommand = 'read'
     parser_read = subparsers.add_parser(
         subcommand,
-        usage=subcomand_usage(__file__, subcommand),
+        usage=subcommand_usage(__file__, subcommand),
         description='Read emails from your inbox which might contain '
                     'unencrypted and encrypted emails.',
         add_help=False,
@@ -1168,7 +1176,8 @@ def main():
                   verbose=main_cfg.verbose,
                   logging_level=main_cfg.logging_level,
                   logging_formatter=main_cfg.logging_formatter,
-                  handler_names=['console'])
+                  level_handler_names=['console', 'file'],
+                  formater_handler_names=['console'])
         process_returned_values(returned_values)
         if main_cfg.subcommand == 'uninstall':
             logger.info('Uninstalling program ...')
@@ -1182,5 +1191,13 @@ def main():
 
 if __name__ == '__main__':
     exit_code = main()
+    """
+    msg = 'Exiting with '
+    code_msg = f'code {exit_code}'
+    if exit_code:
+        code_msg = red(code_msg)
+    msg = msg + code_msg
+    logger.info(msg)
+    """
     logger.info('Exiting with code {}'.format(exit_code))
     sys.exit(exit_code)

@@ -1,6 +1,104 @@
+import copy
 import logging
 import os
-from logging import NullHandler
+from logging import NullHandler, StreamHandler
+
+from cryptlib.utils import genutils
+
+
+class Logger:
+    def __init__(self, name, file_):
+        self.logger = init_log(name, file_)
+        self._removed_handlers = []
+
+    def _add_handlers_back(self):
+        """Add the removed handlers back to the logger.
+        """
+        for h in self._removed_handlers:
+            self.logger.addHandler(h)
+        self._removed_handlers.clear()
+
+    def _keep_everything_but(self, handlers_to_remove):
+        """TODO
+
+        Parameters
+        ----------
+        handlers_to_remove : list of Handlers
+
+        """
+        if not isinstance(handlers_to_remove, list):
+            raise TypeError("handlers_to_remove must be a list")
+        # self._removed_handlers = []
+        # IMPORTANT: TODO you are iterating throughout handlers which you are also
+        # removing items from. Thus it is better to work on a copy of handlers
+        # If you don't, there will items you won't process.
+        # TODO: check also logutils.setup_basic_logger where I don't use 'type(h) in' but just 'h in'
+        handlers = copy.copy(self.logger.handlers)
+        for i, h in enumerate(handlers):
+            if type(h) in handlers_to_remove:
+                self._remove_handler(h)
+
+    def _log(self, logging_fnc, msg, *args, **kwargs):
+        raw_msg = self._remove_colors(msg)
+        self._remove_everything_but(handlers_to_keep=[StreamHandler])
+        if self.logger.handlers:
+            # Call the message-logging function, e.g. logger.info()
+            logging_fnc(msg, *args, **kwargs)
+        # Add the removed non-console handlers back to the logger
+        self._add_handlers_back()
+        self._keep_everything_but(
+            handlers_to_remove=[NullHandler, StreamHandler])
+        # Log the non-colored message with the non-console handlers
+        if self.logger.handlers:
+            logging_fnc(raw_msg, *args, **kwargs)
+        # Add the handlers back to the logger
+        self._add_handlers_back()
+
+    @staticmethod
+    def _remove_colors(msg):
+        for c in genutils.COLORS.values():
+            msg = msg.replace(c, "")
+        return msg
+
+    def _remove_everything_but(self, handlers_to_keep):
+        """TODO
+
+        Parameters
+        ----------
+        handlers_to_keep : list of Handlers
+
+        """
+        if not isinstance(handlers_to_keep, list):
+            raise TypeError("handlers_to_keep must be a list")
+        # self._removed_handlers = []
+        handlers = copy.copy(self.logger.handlers)
+        for h in handlers:
+            if not type(h) in handlers_to_keep:
+                self._remove_handler(h)
+
+    def _remove_handler(self, h):
+        """Remove a handler from the logger.
+
+        Parameters
+        ----------
+        h : logging.Handler
+            The handler to be removed from the logger.
+
+        """
+        self._removed_handlers.append(h)
+        self.logger.removeHandler(h)
+
+    def debug(self, msg, *args, **kwargs):
+        self._log(self.logger.debug, msg, *args, **kwargs)
+
+    def error(self, msg, *args, **kwargs):
+        self._log(self.logger.error, msg, *args, **kwargs)
+
+    def info(self, msg, *args, **kwargs):
+        self._log(self.logger.info, msg, *args, **kwargs)
+
+    def warning(self, msg, *args, **kwargs):
+        self._log(self.logger.warning, msg, *args, **kwargs)
 
 
 # TODO: explain cases

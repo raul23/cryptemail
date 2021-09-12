@@ -58,7 +58,7 @@ smtp_imap = {
 send_emails = {
     'receiver_email_address': 'receiver@mail.com',
     # Sign and encrypt in a single pass. Otherwise, sign first and then encrypt
-    # as separate processes
+    # as separate steps
     'use_single_pass': True,
     # Signature options
     'sign': {
