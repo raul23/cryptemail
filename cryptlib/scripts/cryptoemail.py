@@ -48,8 +48,11 @@ class CryptoEmail:
         self._missing_data = False
 
     def run(self):
-        if self.config.interactive:
+        try:
             self._interact()
+        except Exception as e:
+            self._log_error(e)
+            return 1
         # ===========
         # Subcommands
         # ===========
@@ -311,13 +314,16 @@ class CryptoEmail:
                 logger.debug(f"Removing 'Subject:' from '{self.subject}'")
                 self.subject = self.subject[len('Subject:'):].strip()
 
-    def _input(self, prompt, values=None, lower=False, is_path=False,
+    def _input(self, opt_name, opt_value, values=None, lower=False, is_path=False,
                is_userid=False, is_address=False, is_server=False):
+        if not self.config.interactive:
+            error_msg = f'Invalid data: {opt_name}={opt_value}'
+            raise ValueError(error_msg)
         if not self._missing_data:
             print('\nEnter the following data')
             self._missing_data = True
         while True:
-            ans = input(prompt)
+            ans = input(f'{opt_name}: ')
             ans = ans.lower() if lower else ans
             if values:
                 if ans in values:
@@ -359,16 +365,22 @@ class CryptoEmail:
                      or not self.config.send_emails['sign']['enable_signature']):
                 logger.debug('homedir not necessary')
             elif self.config.homedir == default_config.homedir:
-                self.config.homedir = self._input('homedir: ', is_path=True)
+                self.config.homedir = self._input('homedir', self.config.homedir, is_path=True)
         if (self.config.run_tests and self.config.test_encryption) or self.config.args_test_encryption or \
                 (self.config.subcommand == 'send' and self.config.send_emails['encrypt']['enable_encryption']):
             if self.config.send_emails['encrypt']['recipient_userid'] == \
                     default_config.send_emails['encrypt']['recipient_userid']:
-                self.config.send_emails['encrypt']['recipient_userid'] = self._input('recipient_userid: ', is_userid=True)
+                self.config.send_emails['encrypt']['recipient_userid'] = self._input(
+                    'recipient_userid',
+                    self.config.send_emails['encrypt']['recipient_userid'],
+                    is_userid=True)
         if ((self.config.run_tests and self.config.test_signature) or self.config.args_test_signature or
                 (self.config.subcommand == 'send' and self.config.send_emails['sign']['enable_signature'])):
             if self.config.send_emails['sign']['signature'] == default_config.send_emails['sign']['signature']:
-                self.config.send_emails['sign']['signature'] = self._input('signature: ', is_userid=True)
+                self.config.send_emails['sign']['signature'] = self._input(
+                    'signature',
+                    self.config.send_emails['sign']['signature'],
+                    is_userid=True)
         if (self.config.run_tests and self.config.test_connection) or \
                 self.config.args_test_connection or self.config.subcommand in ['send', 'read']:
             if self.config.subcommand not in ['send', 'read'] and \
@@ -376,7 +388,10 @@ class CryptoEmail:
                 logger.debug("mailbox_address not necessary since just testing "
                              "connection and 'connection_method=googleapi'")
             elif self.config.mailbox_address == default_config.mailbox_address:
-                self.config.mailbox_address = self._input('mailbox_address: ', is_address=True)
+                self.config.mailbox_address = self._input(
+                    'mailbox_address',
+                    self.config.mailbox_address,
+                    is_address=True)
             if ((self.config.subcommand in ['send', 'read']) and self.config.connection_method == 'googleapi') \
                     or (self.config.run_tests and
                         self.config.test_connection == 'googleapi') or \
@@ -384,7 +399,9 @@ class CryptoEmail:
                 if self.config.googleapi['credentials_path'] \
                         == default_config.googleapi['credentials_path']:
                     self.config.googleapi['credentials_path'] = \
-                        self._input('credentials_path: ', is_path=True)
+                        self._input('credentials_path',
+                                    self.config.googleapi['credentials_path'],
+                                    is_path=True)
             if (self.config.subcommand == 'send' and self.config.connection_method == 'smtp_imap')  \
                     or (self.config.run_tests and
                         self.config.test_connection == 'smtp_imap') or \
@@ -392,18 +409,25 @@ class CryptoEmail:
                 if self.config.smtp_imap['smtp_server'] \
                         == default_config.smtp_imap['smtp_server']:
                     self.config.smtp_imap['smtp_server'] = \
-                        self._input('smtp_server: ', is_server=True)
+                        self._input('smtp_server',
+                                    self.config.smtp_imap['smtp_server'],
+                                    is_server=True)
             if self.config.subcommand == 'read' and self.config.connection_method == 'smtp_imap':
                 if self.config.smtp_imap['imap_server'] \
                         == default_config.smtp_imap['imap_server']:
                     self.config.smtp_imap['imap_server'] = \
-                        self._input('imap_server: ', is_server=True)
+                        self._input('imap_server',
+                                    self.config.smtp_imap['imap_server'],
+                                    is_server=True)
             if self.config.subcommand == 'send':
                 if self.config.send_emails['receiver_email_address'] \
                         == default_config.send_emails['receiver_email_address']:
                     self.config.send_emails['receiver_email_address'] = \
-                        self._input('(Receiver) email_address: ', is_address=True)
-        if self._missing_data:
+                        self._input(
+                            '(Receiver) email_address',
+                            self.config.send_emails['receiver_email_address'],
+                            is_address=True)
+        if self._missing_data and self.config.interactive:
             print('')
             self._missing_data = False
 
