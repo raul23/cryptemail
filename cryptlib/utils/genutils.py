@@ -380,6 +380,10 @@ def red(msg):
     return color(msg, 'r')
 
 
+def violet(msg):
+    return color(msg, 'v')
+
+
 def yellow(msg):
     return color(msg)
 

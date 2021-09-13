@@ -65,6 +65,7 @@ class CryptoEmail:
             if self.config.run_tests:
                 self._run_tests()
             else:
+                logger.info(violet('Starting tests ...\n'))
                 if self.config.args_test_encryption:
                     self._test_encryption(self.config.test_message)
                 if self.config.args_test_signature:
@@ -77,19 +78,27 @@ class CryptoEmail:
                     self.tester.n_success, self.tester.n_tests,
                     int(self.tester.success_rate * 100)))
                 logger.info('')
-                success_msg = ''
-                fail_msg = ''
+                success_msg = []
+                fail_msg = []
                 for test_name, result in self.tester.report.items():
                     if result.exit_code == 0:
-                        success_msg += f'- {test_name}\n'
+                        success_msg.append(f'- {test_name}')
                     elif result.exit_code > 0:
-                        fail_msg += f'- {test_name}: {result.error_msg.splitlines()[0]}\n'
+                        fail_msg.append(f'- {test_name}: {result.error_msg.splitlines()[0]}')
                 if fail_msg:
-                    success_msg = success_msg.strip()
+                    msg = fail_msg[-1]
+                    fail_msg[-1] = msg + '\n'
+                elif success_msg:
+                    msg = success_msg[-1]
+                    success_msg[-1] = msg + '\n'
                 if success_msg:
-                    logger.info(f"{green('Successful tests:')}\n{success_msg}")
+                    logger.info(f"{green('Successful tests:')}")
+                    for m in success_msg:
+                        logger.info(m)
                 if fail_msg:
-                    logger.info(f"{red('Failed tests:')}\n{fail_msg}")
+                    logger.info(f"{red('Failed tests:')}")
+                    for m in fail_msg:
+                        logger.info(m)
             else:
                 logger.info('No tests!')
         return 0
@@ -109,12 +118,35 @@ class CryptoEmail:
         if self.config.verbose:
             logger.debug('logging_level = True')
             self.config.logging_level = 'debug'
-        opts = ['run_tests', 'args_test_encryption', 'args_test_connection',
-                'args_test_signature']
-        for opt in opts:
-            if getattr(self.config, opt, None) is None:
-                logger.debug(f'{opt} = None')
-                setattr(self.config, opt, None)
+        if getattr(self.config, 'args_test_connection', None) is not None or \
+                getattr(self.config, 'test_connection', None) is not None:
+            if self.config.run_tests:
+                self.config.connection_method = self.config.test_connection
+            else:
+                self.config.connection_method = self.config.args_test_connection
+            logger.debug(f'connection_method = {self.config.connection_method}')
+        attrs = ['args_test_encryption', 'args_test_connection',
+                 'args_test_signature']
+        if getattr(self.config, 'run_tests', None) is True and \
+                (getattr(self.config, 'args_test_encryption', None) is not False or
+                 getattr(self.config, 'args_test_connection', None) is not None or
+                 getattr(self.config, 'args_test_signature', None) is not False):
+            logger.warning(yellow('Only tests from the config file will be '
+                                  'executed!'))
+            self._setattrs(attrs)
+        attrs.append('run_tests')
+        self._create_attrs(attrs)
+
+    def _create_attrs(self, attrs):
+        for attr in attrs:
+            if getattr(self.config, attr, None) is None:
+                logger.debug(f'{attr} = None')
+                setattr(self.config, attr, None)
+
+    def _setattrs(self, attrs):
+        for attr in attrs:
+            logger.debug(f'{attr} = None')
+            setattr(self.config, attr, None)
 
     def _check_config(self, config):
         for k, v in config.items():
@@ -142,12 +174,13 @@ class CryptoEmail:
             raise ValueError(error_msg)
 
     @staticmethod
-    def _connect_with_tokens(email_account, connection_type, credentials_path, scopes):
+    def _connect_with_tokens(email_account, connection_type, credentials_path,
+                             scopes, check_domain=True):
         logger.info(f"Connecting to the email server with '{connection_type}'")
         logger.debug('Logging to the email server using TOKENS (more secure than '
                      'with PASSWORD)')
         domain = parse.splituser(email_account)[1]
-        if domain != 'gmail.com':
+        if check_domain and domain != 'gmail.com':
             error_msg = "The email domain is invalid: '{}'. Only 'gmail.com' " \
                         "addresses are supported when using TOKEN-based " \
                         "authentication".format(domain)
@@ -338,8 +371,10 @@ class CryptoEmail:
                 self.config.send_emails['sign']['signature'] = self._input('signature: ', is_userid=True)
         if (self.config.run_tests and self.config.test_connection) or \
                 self.config.args_test_connection or self.config.subcommand in ['send', 'read']:
-            if self.config.connection_method == 'googleapi' and False:
-                logger.debug("mailbox_address not necessary since 'connection_method=googleapi'")
+            if self.config.subcommand not in ['send', 'read'] and \
+                    self.config.connection_method == 'googleapi':
+                logger.debug("mailbox_address not necessary since just testing "
+                             "connection and 'connection_method=googleapi'")
             elif self.config.mailbox_address == default_config.mailbox_address:
                 self.config.mailbox_address = self._input('mailbox_address: ', is_address=True)
             if ((self.config.subcommand in ['send', 'read']) and self.config.connection_method == 'googleapi') \
@@ -431,7 +466,7 @@ class CryptoEmail:
             self._test_signature(self.config.test_message)
         if self.config.test_connection:
             self._test_connection(self.config.test_connection)
-        logger.info('End tests from config file\n')
+        # logger.info('End tests from config file\n')
 
     def _send_email(self):
         self._get_message()
@@ -611,7 +646,8 @@ class CryptoEmail:
                 email_account=self.config.mailbox_address,
                 connection_type=connection_type,
                 credentials_path=auth_config['credentials_path'],
-                scopes=auth_config['scopes_for_sending'])
+                scopes=auth_config['scopes_for_sending'],
+                check_domain=False)
             logger.debug("Scopes: "
                          f"{service._rootDesc['auth']['oauth2']['scopes']['https://mail.google.com/']['description']}")
         elif connection == CONNECTIONS['password']:
@@ -682,7 +718,7 @@ class CryptoEmail:
         except ValueError as e:
             error_msg = "The message couldn't be " \
                         "signed\n{}\n".format(e.__str__().strip())
-            logger.error(error_msg)
+            logger.error(red(error_msg))
             result.set_error(error_msg)
             return result
         gpg = gnupg.GPG(gnupghome=self.config.homedir)
@@ -1191,13 +1227,5 @@ def main():
 
 if __name__ == '__main__':
     exit_code = main()
-    """
-    msg = 'Exiting with '
-    code_msg = f'code {exit_code}'
-    if exit_code:
-        code_msg = red(code_msg)
-    msg = msg + code_msg
-    logger.info(msg)
-    """
     logger.info('Exiting with code {}'.format(exit_code))
     sys.exit(exit_code)
