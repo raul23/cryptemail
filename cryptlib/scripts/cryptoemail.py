@@ -6,6 +6,7 @@ import readline
 import smtplib
 import ssl
 import string
+import time
 import traceback
 from email.mime.text import MIMEText
 from functools import wraps
@@ -34,6 +35,10 @@ CONNECTIONS = {'tokens': 'googleapi', 'password': 'smtp_imap'}
 
 
 logger = Logger(__name__, __file__)
+
+
+class InvalidDataError(Exception):
+    """Raised if TODO..."""
 
 
 class CryptoEmail:
@@ -68,7 +73,10 @@ class CryptoEmail:
             if self.config.run_tests:
                 self._run_tests()
             else:
-                logger.info(violet('Starting tests ...\n'))
+                if self.config.args_test_encryption or \
+                    self.config.args_test_signature or \
+                        self.config.args_test_connection:
+                    logger.info(violet('Starting tests ...\n'))
                 if self.config.args_test_encryption:
                     self._test_encryption(self.config.test_message)
                 if self.config.args_test_signature:
@@ -103,7 +111,7 @@ class CryptoEmail:
                     for m in fail_msg:
                         logger.info(m)
             else:
-                logger.info('No tests!')
+                logger.warning(yellow('No tests!'))
         return 0
 
     def _check_args(self):
@@ -121,6 +129,22 @@ class CryptoEmail:
         if self.config.verbose:
             logger.debug('logging_level = True')
             self.config.logging_level = 'debug'
+        if getattr(self.config, 'args_test_encryption', None) is not None or \
+                not getattr(self.config, 'test_encryption', None):
+            if not self.config.run_tests:
+                self.config.send_emails['encrypt']['recipient_userid'] = \
+                    self.config.args_test_encryption
+            logger.debug(
+                "recipient_userid = "
+                f"{self.config.send_emails['encrypt']['recipient_userid']}")
+        if getattr(self.config, 'args_test_signature', None) is not None or \
+                not getattr(self.config, 'test_signature', None):
+            if not self.config.run_tests:
+                self.config.send_emails['sign']['signature'] = \
+                    self.config.args_test_signature
+            logger.debug(
+                "signature = "
+                f"{self.config.send_emails['sign']['signature']}")
         if getattr(self.config, 'args_test_connection', None) is not None or \
                 getattr(self.config, 'test_connection', None) is not None:
             if self.config.run_tests:
@@ -131,9 +155,9 @@ class CryptoEmail:
         attrs = ['args_test_encryption', 'args_test_connection',
                  'args_test_signature']
         if getattr(self.config, 'run_tests', None) is True and \
-                (getattr(self.config, 'args_test_encryption', None) is not False or
+                (getattr(self.config, 'args_test_encryption', None) is not None or
                  getattr(self.config, 'args_test_connection', None) is not None or
-                 getattr(self.config, 'args_test_signature', None) is not False):
+                 getattr(self.config, 'args_test_signature', None) is not None):
             logger.warning(yellow('Only tests from the config file will be '
                                   'executed!'))
             self._setattrs(attrs)
@@ -164,14 +188,14 @@ class CryptoEmail:
     @staticmethod
     def _check_gnupghome(gnupghome):
         if gnupghome is None:
-            logger.warning('gnupghome is None and will thus take whatever gpg '
-                           'defaults to (e.g. ~/.gnupg)')
+            logger.warning(yellow('gnupghome is None and will thus take '
+                                  'whatever gpg defaults to (e.g. ~/.gnupg)'))
 
     @staticmethod
     def _check_subject_and_text(subject, text):
         if (subject.startswith('Subject:') and not subject.strip('Subject:')) \
                 or not subject:
-            logger.warning('Message subject is empty')
+            logger.warning(yellow('Message subject is empty'))
         if not text:
             error_msg = f"No message text given"
             raise ValueError(error_msg)
@@ -223,14 +247,15 @@ class CryptoEmail:
         def encrypt_using_gpg(msg):
             start = 'Signing and encrypting' if sign else 'Encrypting'
             logger.info("{} the message (recipient='{}') "
-                        "...".format(start, recipient))
+                        "...".format(start, bold(recipient)))
             passphrase = None
             if sign:
                 passphrase = get_gpg_passphrase(
                     prompt=self.config.prompt_passwords,
                     gpg=gpg,
-                    recipient=recipient,
-                    message='Enter your GPG passphrase for signing')
+                    fingerprint=config['sign']['signature'],
+                    message=blue("Enter your GPG passphrase for signing with "
+                                 f"fingerprint='{config['sign']['signature']}'"))
             return gpg.encrypt(msg, recipient, sign=sign, passphrase=passphrase)
 
         encryption_program = config['encrypt'].get('program')
@@ -316,11 +341,14 @@ class CryptoEmail:
 
     def _input(self, opt_name, opt_value, values=None, lower=False, is_path=False,
                is_userid=False, is_address=False, is_server=False):
+        def invalid(msg):
+            return red(msg)
+
         if not self.config.interactive:
-            error_msg = f'Invalid data: {opt_name}={opt_value}'
-            raise ValueError(error_msg)
+            error_msg = f'invalid data => {opt_name}={opt_value}'
+            raise InvalidDataError(error_msg)
         if not self._missing_data:
-            print('\nEnter the following data')
+            print(blue('\nEnter the following data'))
             self._missing_data = True
         while True:
             ans = input(f'{opt_name}: ')
@@ -329,32 +357,32 @@ class CryptoEmail:
                 if ans in values:
                     return ans
                 else:
-                    print('Invalid value!')
+                    print(invalid('Invalid value!'))
             elif is_path:
                 ans = os.path.expanduser(ans)
                 if os.path.exists(ans):
                     return ans
                 else:
-                    print("Path doesn't exist!")
+                    print(invalid("Path doesn't exist!"))
             elif is_userid:
                 if os.path.exists(self.config.homedir):
                     gpg = gnupg.GPG(gnupghome=self.config.homedir)
                     if self._fingerprint_exists(ans, gpg):
                         return ans
                     else:
-                        print("userid not found!")
+                        print(invalid("userid not found!"))
                 else:
                     return ans
             elif is_address:
                 if self._is_valid_email(ans):
                     return ans
                 else:
-                    print("Invalid address!")
+                    print(invalid("Invalid address!"))
             elif is_server:
                 if self._is_valid_servername(ans):
                     return ans
                 else:
-                    print("Invalid server name!")
+                    print(invalid("Invalid server name!"))
 
     def _interact(self):
         if (self.config.run_tests and (self.config.test_encryption or self.config.test_signature)) or \
@@ -503,8 +531,9 @@ class CryptoEmail:
                 == config['sign']['signature'] \
                 and config['encrypt']['enable_encryption'] \
                 and config['sign']['enable_signature']:
-            logger.warning('Signing with the same encryption key. Both '
-                           'encryption and signature fingerprints are the same')
+            logger.warning(yellow('Signing with the same encryption key. Both '
+                                  'encryption and signature fingerprints are '
+                                  'the same'))
         if not config['sign']['enable_signature']:
             logger.info("No signature will be applied on the email")
         elif config['sign']['enable_signature'] and \
@@ -515,8 +544,8 @@ class CryptoEmail:
                 message_text = str(signed_message)
             except ValueError as e:
                 error_msg = "The email couldn't be signed with the program " \
-                            "{}\n{}\n".format(config['sign']['program'], e)
-                logger.error(error_msg)
+                            "{}\n{}".format(config['sign']['program'], e)
+                logger.error(red(error_msg))
                 return result.set_error(error_msg)
         elif config['sign']['enable_signature'] and \
                 config['encrypt']['enable_encryption'] \
@@ -533,7 +562,8 @@ class CryptoEmail:
                 self._log_error(error_msg)
                 return result.set_error(error_msg)
         else:
-            logger.info('No encryption will be applied on the email')
+            logger.warning(yellow('No encryption will be applied on the email ...'))
+            time.sleep(2)
         # Connect to the email provider server and send the encrypted email
         logger.info(f"sender email address: "
                     f"{self.config.mailbox_address}")
@@ -563,7 +593,7 @@ class CryptoEmail:
                         "email can't be sent."
             logger.error(error_msg + '\n')
             return result.set_error(error_msg)
-        logger.info(f"Connecting to the smtp server '{smtp_config['smtp_server']}'...")
+        logger.info(f"Connecting to the smtp server '{smtp_config['smtp_server']}' ...")
         with smtplib.SMTP(smtp_config['smtp_server'],
                           smtp_config['smtp_port']) as server:
             retval = self._login_stmp(server, password)
@@ -573,7 +603,7 @@ class CryptoEmail:
             # Fail (printed): *** smtplib.SMTPServerDisconnected: please run connect() first
             logger.debug('Message to be sent to {}:\n{}'.format(
                 config['receiver_email_address'], message))
-            logger.info('Sending email...')
+            logger.info('Sending email ...')
             server.sendmail(self.config.mailbox_address,
                             config['receiver_email_address'], message)
             logger.info(green('Message sent!'))
@@ -595,7 +625,7 @@ class CryptoEmail:
         logger.debug("Message to be sent to "
                      f"{self.config.send_emails['receiver_email_address']}:\n"
                      f"Subject: {self.subject}\n\n{message_text}")
-        logger.info('Sending email...')
+        logger.info('Sending email ...')
         result_send = send_message(
             service, self.config.mailbox_address, msg)
         if result_send is None:
@@ -618,7 +648,7 @@ class CryptoEmail:
         config = self.config.send_emails
         if config['sign']['program'] == 'GPG':
             logger.info("Signing message (signature='{}') ...".format(
-                config['sign']['signature']))
+                bold(config['sign']['signature'])))
         else:
             error_msg = "Signature program not supported: " \
                         "{}\n".format(config['sign']['program'])
@@ -627,14 +657,21 @@ class CryptoEmail:
         passphrase = get_gpg_passphrase(
             prompt=self.config.prompt_passwords,
             gpg=gpg,
-            recipient=config['sign']['signature'],
-            message="Enter your GPG passphrase for signing with fingerprint="
-                    f"'{config['sign']['signature']}'")
+            fingerprint=config['sign']['signature'],
+            message=blue("Enter your GPG passphrase for signing with "
+                         f"fingerprint='{config['sign']['signature']}'"))
         message = gpg.sign(message_text,
                            keyid=config['sign']['signature'],
                            passphrase=passphrase)
         del passphrase
-        if message.status == 'signature created':
+        if message.status == 'signature created' and \
+                message.fingerprint != self.config.send_emails['sign']['signature']:
+            error_msg = 'The fingerprint used for signing ' \
+                        f'({message.fingerprint}) is different from the one in ' \
+                        'the config ' \
+                        f"({self.config.send_emails['sign']['signature']})\n"
+            raise ValueError(error_msg)
+        elif message.status == 'signature created':
             logger.info('Message signed')
             return message
         else:
@@ -680,7 +717,7 @@ class CryptoEmail:
             password = self._get_email_password(
                 self.config.mailbox_address,
                 self.config.prompt_passwords)
-            logger.info(f"Connecting to the smtp server '{smtp_config['smtp_server']}'...")
+            logger.info(f"Connecting to the smtp server '{smtp_config['smtp_server']}' ...")
             with smtplib.SMTP(smtp_config['smtp_server'],
                               smtp_config['smtp_port']) as server:
                 retval = self._login_stmp(server, password)
@@ -702,9 +739,12 @@ class CryptoEmail:
         try:
             encrypted_message = self._encrypt_message(plaintext_message)
         except ValueError as e:
+            """
             error_msg = "The message couldn't be encrypted with the " \
                         "program '{}'\n{}\n".format(
                             self.config.send_emails['encrypt']['program'], e)
+            """
+            error_msg = f'{e}\n'
             logger.error(red(error_msg))
             return result.set_error(error_msg)
         logger.info('')
@@ -713,7 +753,15 @@ class CryptoEmail:
         logger.info('status: {}'.format(encrypted_message.status))
         logger.debug('stderr:\n{}'.format(encrypted_message.stderr))
         gpg = gnupg.GPG(gnupghome=self.config.homedir)
-        decrypted_message = gpg.decrypt(str(encrypted_message))
+        passphrase = get_gpg_passphrase(
+            prompt=self.config.prompt_passwords,
+            gpg=gpg,
+            fingerprint=self.config.send_emails['encrypt']['recipient_userid'],
+            message=blue("Enter your GPG passphrase for decrypting with "
+                         "fingerprint="
+                         f"'{self.config.send_emails['encrypt']['recipient_userid']}'"))
+        decrypted_message = gpg.decrypt(str(encrypted_message), passphrase=passphrase)
+        del passphrase
         logger.info('')
         logger.info('## Decryption results ##')
         logger.info('ok: {}'.format(decrypted_message.ok))
@@ -753,14 +801,7 @@ class CryptoEmail:
         logger.info('status: {}'.format(verify.status))
         logger.debug('stderr:\n{}'.format(verify.stderr))
         logger.info('')
-        if verify.fingerprint != self.config.send_emails['sign']['signature']:
-            error_msg = 'The fingerprint used for signing ' \
-                        f'({verify.fingerprint}) is different from the one in ' \
-                        'the config ' \
-                        f"({self.config.send_emails['sign']['signature']})\n"
-            logger.error(red(error_msg))
-            result.set_error(error_msg)
-        elif verify.valid:
+        if verify.valid:
             logger.info(green('Signing message successful!\n'))
             result.set_success()
         else:
@@ -839,12 +880,12 @@ def generate_random_string(n=10):
     return ''.join([choice(string.ascii_uppercase + string.digits) for _ in range(n)])
 
 
-def get_gpg_passphrase(prompt=False, gpg=None, recipient=None, message=None):
-    if gpg and recipient:
+def get_gpg_passphrase(prompt=False, gpg=None, fingerprint=None, message=None):
+    if gpg and fingerprint:
         logger.debug('Checking if the passphrase is already cached '
                      '(by gpg-agent)')
         msg = 'test'
-        encrypted_data = gpg.encrypt(msg, recipient)
+        encrypted_data = gpg.encrypt(msg, fingerprint)
         decrypted_data = gpg.decrypt(str(encrypted_data),
                                      passphrase=generate_random_string())
         if msg == decrypted_data.data.decode():
@@ -1143,19 +1184,17 @@ def setup_argparser():
     add_connection_options(parser_test, remove_opts=['conn'])
     add_googleapi_options(parser_test)
     add_smtp_imap_options(parser_test)
-    add_encryption_options(parser_test, remove_opts=['unencrypt'])
     parser_test_group = parser_test.add_argument_group(title=f"{yellow('Test options')}")
     parser_test_group.add_argument(
         '-r', '--run-tests', dest='run_tests', action='store_true',
         help='Run a set of tests as defined in the config file.')
     parser_test_group.add_argument(
-        '-e', '--encryption', dest='args_test_encryption',
-        action='store_true',
+        '-e', '--encryption', dest='args_test_encryption', metavar='USERID',
         help='Test encrypting and decrypting a message. The encryption program '
              'used (e.g. GPG) is the one defined in the config file.')
     parser_test_group.add_argument(
-        '-s', '--signature', dest='args_test_signature',
-        action='store_true', help='Test signing a message.')
+        '-s', '--signature', dest='args_test_signature', metavar='USERID',
+        help='Test signing a message.')
     parser_test_group.add_argument(
         '-m', '--message', metavar='MESSAGE', dest='test_message',
         default=default_config.test_message,

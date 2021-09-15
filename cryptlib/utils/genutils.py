@@ -372,6 +372,10 @@ def blue(msg):
     return color(msg, 'b')
 
 
+def bold(msg):
+    return color(msg, 'bold')
+
+
 def green(msg):
     return color(msg, 'g')
 
