@@ -4,7 +4,6 @@ import getpass
 import re
 import readline
 import smtplib
-import socket
 import ssl
 import string
 import time
@@ -56,6 +55,34 @@ class CryptoEmail:
         self.tester = Tester()
         self._missing_data = False
 
+    def _update_keyring(self):
+        result = Result()
+        if self.config.email_password:
+            service = KEYRING_SERVICE_EMAIL_PASS
+            enter_msg = 'Enter the new email password'
+            prompt = 'Email password (will not be echoed): '
+            prompt_verify = 'Verify password (will not be echoed): '
+            success_msg = 'Successful password update!'
+        else:
+            service = KEYRING_SERVICE_GPG_PASS
+            enter_msg = 'Enter the new GPG passphrase'
+            prompt = 'GPG passphrase (will not be echoed): '
+            prompt_verify = 'Verify GPG passphrase (will not be echoed): '
+            success_msg = 'Successful passphrase update!'
+        old_password = keyring.get_password(service, self.config.username)
+        if not old_password:
+            error_msg = "Couldn't find the account associated with the " \
+                        f"username='{self.config.username}' in the keyring"
+            self._log_error(error_msg)
+            return result.set_error(error_msg)
+        print(blue(enter_msg))
+        password = prompt_password(prompt, prompt_verify)
+        keyring.set_password(service, self.config.username, password)
+        logger.info(green(success_msg))
+        time.sleep(1)
+        result.set_success()
+        return result
+
     def run(self):
         try:
             self._interact()
@@ -70,6 +97,23 @@ class CryptoEmail:
                 return self._send_email().exit_code
             if self.config.subcommand == 'read':
                 return self._read_emails()
+            if self.config.subcommand == 'update':
+                ans = None
+                if not self.config.email_password and not self.config.gpg_passphrase:
+                    print(blue('What do you want to update in keyring?'))
+                    print(blue('(1) Email password\n(2) GPG passphrase'))
+                    ans = self._input('Choice', values=['1', '2'])
+                    print('')
+                if self.config.email_password or ans == '1':
+                    logger.info('Updating the email password ...')
+                    self.config.email_password = True
+                else:
+                    logger.info('Updating the GPG passphrase ...')
+                    self.config.gpg_passphrase = True
+                if ans:
+                    time.sleep(0.5)
+                print('')
+                return self._update_keyring().exit_code
         except Exception as e:
             self._log_error(e)
             return 1
@@ -306,7 +350,8 @@ class CryptoEmail:
         return 1
 
     def _get_email_password(self, email_account, prompt=False):
-        keyring_username = f'{email_account} - Email password'
+        credential = None
+        keyring_username = f'{email_account}'
         password = keyring.get_password(KEYRING_SERVICE_EMAIL_PASS, keyring_username)
         if not password:
             logger.debug("An email password couldn't be found saved locally")
@@ -314,15 +359,14 @@ class CryptoEmail:
                 print(blue(f'Enter email password for {bold(email_account)}'))
                 password = prompt_password(
                     prompt='Email password (will not be echoed): ',
-                    prompt_verify='Verify password (will not be echoed): ')
-                keyring.set_password(KEYRING_SERVICE_EMAIL_PASS, keyring_username,
-                                     password)
+                    prompt_verify='Enter password again (will not be echoed): ')
+                credential = (KEYRING_SERVICE_EMAIL_PASS, keyring_username, password)
             if not password:
                 if not prompt:
                     logger.warning(yellow('prompt_passwords = False'))
                 raise ValueError("An email password couldn't be retrieved "
-                                 f"for {email_account}")
-        return password
+                                 f"for {bold(email_account)}")
+        return password, credential
 
     def _get_message(self):
         if self.config.email_message:
@@ -350,20 +394,15 @@ class CryptoEmail:
                 logger.debug(f"Removing 'Subject:' from '{self.subject}'")
                 self.subject = self.subject[len('Subject:'):].strip()
 
-    def _input(self, opt_name, opt_value, values=None, lower=False, is_path=False,
+    def _input(self, opt_name, values=None, lower=False, is_path=False,
                is_userid=False, is_address=False, is_server=False):
         def invalid(msg):
             return red(msg)
 
-        if not self.config.interactive:
-            error_msg = f'invalid data => {opt_name}={opt_value}'
-            raise InvalidDataError(error_msg)
-        if not self._missing_data:
-            print(blue('\nEnter the following data'))
-            self._missing_data = True
         while True:
             ans = input(f'{opt_name}: ')
             ans = ans.lower() if lower else ans
+            ans = ans.strip()
             if values:
                 if ans in values:
                     return ans
@@ -394,6 +433,20 @@ class CryptoEmail:
                     return ans
                 else:
                     print(invalid("Invalid server name!"))
+            else:
+                return ans
+
+    def _input_missing_data(self, opt_name, opt_value=None, values=None,
+                            lower=False, is_path=False, is_userid=False,
+                            is_address=False, is_server=False):
+        if not self.config.interactive and opt_value:
+            error_msg = f'invalid data => {opt_name}={opt_value}'
+            raise InvalidDataError(error_msg)
+        if not self._missing_data:
+            print(blue('\nEnter the following data'))
+            self._missing_data = True
+        self._input(opt_name, values, lower, is_path, is_userid, is_address,
+                    is_server)
 
     def _interact(self):
         if (self.config.run_tests and (self.config.test_encryption or self.config.test_signature)) or \
@@ -404,19 +457,19 @@ class CryptoEmail:
                      or not self.config.send_emails['sign']['enable_signature']):
                 logger.debug('homedir not necessary')
             elif self.config.homedir == default_config.homedir:
-                self.config.homedir = self._input('homedir', self.config.homedir, is_path=True)
+                self.config.homedir = self._input_missing_data('homedir', self.config.homedir, is_path=True)
         if (self.config.run_tests and self.config.test_encryption) or self.config.args_test_encryption or \
                 (self.config.subcommand == 'send' and self.config.send_emails['encrypt']['enable_encryption']):
             if self.config.send_emails['encrypt']['recipient_userid'] == \
                     default_config.send_emails['encrypt']['recipient_userid']:
-                self.config.send_emails['encrypt']['recipient_userid'] = self._input(
+                self.config.send_emails['encrypt']['recipient_userid'] = self._input_missing_data(
                     'recipient_userid',
                     self.config.send_emails['encrypt']['recipient_userid'],
                     is_userid=True)
         if ((self.config.run_tests and self.config.test_signature) or self.config.args_test_signature or
                 (self.config.subcommand == 'send' and self.config.send_emails['sign']['enable_signature'])):
             if self.config.send_emails['sign']['signature'] == default_config.send_emails['sign']['signature']:
-                self.config.send_emails['sign']['signature'] = self._input(
+                self.config.send_emails['sign']['signature'] = self._input_missing_data(
                     'signature',
                     self.config.send_emails['sign']['signature'],
                     is_userid=True)
@@ -427,7 +480,7 @@ class CryptoEmail:
                 logger.debug("mailbox_address not necessary since just testing "
                              "connection and 'connection_method=googleapi'")
             elif self.config.mailbox_address == default_config.mailbox_address:
-                self.config.mailbox_address = self._input(
+                self.config.mailbox_address = self._input_missing_data(
                     'mailbox_address',
                     self.config.mailbox_address,
                     is_address=True)
@@ -438,9 +491,9 @@ class CryptoEmail:
                 if self.config.googleapi['credentials_path'] \
                         == default_config.googleapi['credentials_path']:
                     self.config.googleapi['credentials_path'] = \
-                        self._input('credentials_path',
-                                    self.config.googleapi['credentials_path'],
-                                    is_path=True)
+                        self._input_missing_data('credentials_path',
+                                                 self.config.googleapi['credentials_path'],
+                                                 is_path=True)
             if (self.config.subcommand == 'send' and self.config.connection_method == 'smtp_imap')  \
                     or (self.config.run_tests and
                         self.config.test_connection == 'smtp_imap') or \
@@ -448,21 +501,21 @@ class CryptoEmail:
                 if self.config.smtp_imap['smtp_server'] \
                         == default_config.smtp_imap['smtp_server']:
                     self.config.smtp_imap['smtp_server'] = \
-                        self._input('smtp_server',
-                                    self.config.smtp_imap['smtp_server'],
-                                    is_server=True)
+                        self._input_missing_data('smtp_server',
+                                                 self.config.smtp_imap['smtp_server'],
+                                                 is_server=True)
             if self.config.subcommand == 'read' and self.config.connection_method == 'smtp_imap':
                 if self.config.smtp_imap['imap_server'] \
                         == default_config.smtp_imap['imap_server']:
                     self.config.smtp_imap['imap_server'] = \
-                        self._input('imap_server',
+                        self._input_missing_data('imap_server',
                                     self.config.smtp_imap['imap_server'],
                                     is_server=True)
             if self.config.subcommand == 'send':
                 if self.config.send_emails['receiver_email_address'] \
                         == default_config.send_emails['receiver_email_address']:
                     self.config.send_emails['receiver_email_address'] = \
-                        self._input(
+                        self._input_missing_data(
                             '(Receiver) email_address',
                             self.config.send_emails['receiver_email_address'],
                             is_address=True)
@@ -489,12 +542,14 @@ class CryptoEmail:
     def _log_error(self, error, nl=False):
         if self.config.verbose:
             error_msg = f'{traceback.format_exc()}'.strip()
-            if error.__str__() not in error_msg:
+            if error_msg == 'NoneType: None':
+                error_msg = error
+            elif error.__str__() not in error_msg:
                 error_msg += f'\n{error}'
         else:
             error_msg = red(error.__str__())
         if nl:
-            error_msg = error_msg + '\n'
+            error_msg += '\n'
         logger.error(red(f'{error_msg}'))
 
     def _login_stmp(self, server, password):
@@ -517,7 +572,7 @@ class CryptoEmail:
             return 0
 
     def _read_emails(self):
-        logger.info('Reading emails ...')
+        logger.info(blue('### Reading emails ###'))
         return 0
 
     def _run_tests(self):
@@ -596,19 +651,33 @@ class CryptoEmail:
 {}
 
 {}""".format(self.subject, message_text)
-        password = self._get_email_password(self.config.mailbox_address,
-                                            self.config.prompt_passwords)
+        password, credential = self._get_email_password(
+            self.config.mailbox_address, self.config.prompt_passwords)
+        # TODO: remove following, already taken care in _get_email_password()
+        # i.e., raise ValueError if no password
+        """
         if password is None:
             error_msg = "No email password could be retrieved. Thus, the " \
                         "email can't be sent."
             logger.error(error_msg + '\n')
             return result.set_error(error_msg)
-        logger.info(f"Connecting to the smtp server '{smtp_config['smtp_server']}' ...")
+        """
+        logger.info("Connecting to the smtp server "
+                    f"'{smtp_config['smtp_server']}' ...")
         with smtplib.SMTP(smtp_config['smtp_server'],
                           smtp_config['smtp_port']) as server:
             retval = self._login_stmp(server, password)
             if retval:
+                if credential:
+                    warning_msg = "The email password could not be set in " \
+                                  "the keyring for the " \
+                                  f"username={bold(credential[1])}\n"
+                    logger.warning(yellow(warning_msg))
                 return retval
+            if credential:
+                logger.info(violet('Setting email password in keyring for the '
+                                   f'username={bold(credential[1])}'))
+                keyring.set_password(*credential)
             # Success: {}
             # Fail (printed): *** smtplib.SMTPServerDisconnected: please run connect() first
             logger.debug("Message to be sent to "
@@ -709,6 +778,7 @@ class CryptoEmail:
     def _test_connection(self, connection):
         logger.info(blue(f"### Test connection with '{connection}' ###"))
         result = Result()
+        credential = None
         if connection == CONNECTIONS['tokens']:
             self.config.connection_method = connection
             connection_type = self.config.connection_method
@@ -721,24 +791,35 @@ class CryptoEmail:
                 check_domain=False)
             logger.debug("Scopes: "
                          f"{service._rootDesc['auth']['oauth2']['scopes']['https://mail.google.com/']['description']}")
+            result.set_success()
         elif connection == CONNECTIONS['password']:
             self.config.connection_method = self.config.smtp_imap
             smtp_config = self.config.connection_method
-            password = self._get_email_password(
+            password, credential = self._get_email_password(
                 self.config.mailbox_address,
                 self.config.prompt_passwords)
             logger.info(f"Connecting to the smtp server '{smtp_config['smtp_server']}' ...")
             with smtplib.SMTP(smtp_config['smtp_server'],
                               smtp_config['smtp_port']) as server:
                 retval = self._login_stmp(server, password)
-                result = retval if retval else result
+                if retval:
+                    result = retval
+                else:
+                    result.set_success()
         else:
             error_msg = f'Connection method not supported: {connection}\n'
             result.set_error(error_msg)
             logger.error(red(error_msg))
-        if not result.exit_code:
+        if result.exit_code == 0:
+            if credential:
+                logger.info(violet('Setting email password in keyring for the '
+                            f'username={bold(credential[1])}'))
+                keyring.set_password(*credential)
             logger.info(green('Connection successful!\n'))
-            result.set_success()
+        elif credential:
+            warning_msg = "The email password could not be set in the " \
+                          f"keyring for the username={bold(credential[1])}\n"
+            logger.warning(yellow(warning_msg))
         return result
 
     @_update_report('testing encryption/decryption')
@@ -792,7 +873,7 @@ class CryptoEmail:
 
     @_update_report('testing signing')
     def _test_signature(self, message):
-        logger.info(blue('### Test message signing ###'))
+        logger.info(blue('### Test signing message ###'))
         result = Result()
         logger.info(f'Message to be signed: {message}')
         try:
@@ -905,11 +986,12 @@ def get_gpg_passphrase(prompt=False, gpg=None, fingerprint=None, message=None):
     if os.path.exists(conf_path):
         with open(conf_path, 'r') as f:
             conf_data = f.read()
-        if 'pinentry-program' in conf_data:
+        found = re.search('^(pinentry-program)', conf_data, re.MULTILINE)
+        if found:
             logger.debug('pinentry might be used for entering the passphrase')
             # if not saved in keyring
             return None
-    keyring_username = f'{fingerprint} - GPG passphrase'
+    keyring_username = f'{fingerprint}'
     passphrase = keyring.get_password(KEYRING_SERVICE_GPG_PASS, keyring_username)
     if passphrase:
         logger.debug('GPG passphrase retrieved from keyring')
@@ -1293,6 +1375,32 @@ def setup_argparser():
     add_googleapi_options(parser_read)
     add_smtp_imap_options(parser_read)
     parser_read_group = parser_send.add_argument_group(title=f"{yellow('Read options')}")
+    # ==============
+    # Update options
+    # ==============
+    # create the parser for the "update" command
+    subcommand = 'update'
+    parser_update = subparsers.add_parser(
+        subcommand,
+        usage=subcommand_usage(__file__, subcommand),
+        description='Update keyring (i.e. email password or GPG passphrase).',
+        add_help=False,
+        help='Update keyring.',
+        formatter_class=lambda prog: MyFormatter(
+            prog, max_help_position=50, width=width))
+    add_general_options(parser_update,
+                        remove_opts=['homedir', 'interactive', 'prompt_passwords'])
+    parser_update_group = parser_update.add_argument_group(
+        title=f"{yellow('Update options')}")
+    parser_update_group.add_argument('-e', '--email-password', dest='email_password',
+                                     action='store_true',
+                                     help='Update email password saved in keyring.')
+    parser_update_group.add_argument('-g', '--gpg-passphrase', dest='gpg_passphrase',
+                                     action='store_true',
+                                     help='Update GPG password saved in keyring.')
+    parser_update_group.add_argument('-u', '--username', dest='username', required=True,
+                                     help='Username.')
+    # TODO: mutual excl between gpg_passphrase and email_password
     return parser
 
 
