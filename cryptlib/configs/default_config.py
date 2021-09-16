@@ -5,7 +5,7 @@
 # ==============
 # Common options
 # ==============
-# Home directory where the keys (e.g. GnuPG) will be saved
+# Home directory where the keys are saved (e.g. ~/.gnupg)
 homedir = '/path/to/homedir'
 interactive = False
 prompt_passwords = True
