@@ -76,11 +76,17 @@ logging = {
           'handlers': ['console', 'file'],
           'propagate': False
         },
-        'scripts.cryptoemail':
+        'cryptoemail.script':
         {
           'level': 'INFO',
           'handlers': ['console', 'file'],
           'propagate': False
+        },
+        'cryptoemail.lib':
+        {
+            'level': 'INFO',
+            'handlers': ['console', 'file'],
+            'propagate': False
         },
         'utils.genutils':
         {
