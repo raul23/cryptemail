@@ -660,7 +660,7 @@ class CryptoEmail:
             retval = self._login_stmp(server, password)
             if retval:
                 if credential:
-                    warning_msg = "The email password could not be set in " \
+                    warning_msg = "The email password could not be added in " \
                                   "the keyring for the " \
                                   f"username={bold(credential[1])}\n"
                     logger.warning(yellow(warning_msg))
@@ -808,7 +808,7 @@ class CryptoEmail:
                 keyring.set_password(*credential)
             logger.info(green('Connection successful!\n'))
         elif credential:
-            warning_msg = "The email password could not be set in the " \
+            warning_msg = "The email password could not be added in the " \
                           f"keyring for the username={bold(credential[1])}\n"
             logger.warning(yellow(warning_msg))
         return result
