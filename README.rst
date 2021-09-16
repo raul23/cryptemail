@@ -14,7 +14,9 @@ Python command-line program for sending and reading encrypted emails.
    :depth: 3
    :local:
    :backlinks: top
- 
+
+.. Always use the latest version (e.g. Gnu Privacy Guard (GPG)).
+   
 .. 
   Python dependencies
   ===================
