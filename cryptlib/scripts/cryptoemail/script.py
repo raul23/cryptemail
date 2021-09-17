@@ -25,9 +25,6 @@ from lib import *
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 logging.getLogger('gnupg').setLevel(logging.ERROR)
 
-KEYRING_SERVICE_EMAIL_PASS = f'{cryptlib.__project_name__}.email_password'
-KEYRING_SERVICE_GPG_PASS = f'{cryptlib.__project_name__}.gpg_passphrase'
-
 logger = Logger(__name__, __file__)
 
 
@@ -288,14 +285,16 @@ class CryptoEmail:
             logger.info(f"{start} the message (recipient='{bold(recipient)}') "
                         "...")
             passphrase = None
+            cred = None
             if sign:
-                passphrase = get_gpg_passphrase(
+                passphrase, cred = get_gpg_passphrase(
                     prompt=self.config.prompt_passwords,
                     gpg=gpg,
                     fingerprint=config['sign']['signature'],
                     message=blue("Enter your GPG passphrase for signing with "
                                  f"fingerprint='{config['sign']['signature']}'"))
-            return gpg.encrypt(msg, recipient, sign=sign, passphrase=passphrase)
+            enc = gpg.encrypt(msg, recipient, sign=sign, passphrase=passphrase)
+            return enc, cred
 
         encryption_program = config['encrypt'].get('program')
         if encryption_program in ['GPG']:
@@ -309,8 +308,9 @@ class CryptoEmail:
             raise ValueError(error_msg)
         if encryption_program == 'GPG':
             gpg = gnupg.GPG(gnupghome=self.config.homedir)
+            credential = None
             if self._fingerprint_exists(recipient, gpg):
-                encrypted_msg = encrypt_using_gpg(unencrypted_msg)
+                encrypted_msg, credential = encrypt_using_gpg(unencrypted_msg)
                 status = encrypted_msg.status
                 stderr = encrypted_msg.stderr.strip()
             else:
@@ -320,7 +320,9 @@ class CryptoEmail:
                          "keyring"
             if status == 'encryption ok':
                 logger.info('Message encrypted')
+                update_gpg_pass(credential, success=True)
             else:
+                update_gpg_pass(credential, success=False)
                 error_msg = f"Status from encrypt(): {status}\n" \
                             f"{stderr}"
                 # TODO: important, another exception type?
@@ -339,25 +341,6 @@ class CryptoEmail:
                          "the keyring")
             return 0
         return 1
-
-    def _get_email_password(self, email_account, prompt=False):
-        credential = None
-        keyring_username = f'{email_account}'
-        password = keyring.get_password(KEYRING_SERVICE_EMAIL_PASS, keyring_username)
-        if not password:
-            logger.debug("An email password couldn't be found saved locally")
-            if prompt:
-                print(blue(f'Enter email password for {bold(email_account)}'))
-                password = prompt_password(
-                    prompt='Email password (will not be echoed): ',
-                    prompt_verify='Enter password again (will not be echoed): ')
-                credential = (KEYRING_SERVICE_EMAIL_PASS, keyring_username, password)
-            if not password:
-                if not prompt:
-                    logger.warning(yellow('prompt_passwords = False'))
-                raise ValueError("An email password couldn't be retrieved "
-                                 f"for {bold(email_account)}")
-        return password, credential
 
     def _get_message(self):
         if self.config.email_message:
@@ -507,7 +490,7 @@ class CryptoEmail:
                         == default_config.send_emails['receiver_email_address']:
                     self.config.send_emails['receiver_email_address'] = \
                         self._input_missing_data(
-                            '(Receiver) email_address',
+                            'receiver_email_address',
                             self.config.send_emails['receiver_email_address'],
                             is_address=True)
         if self._missing_data and self.config.interactive:
@@ -642,9 +625,9 @@ class CryptoEmail:
 {}
 
 {}""".format(self.subject, message_text)
-        password, credential = self._get_email_password(
+        password, credential = get_email_password(
             self.config.mailbox_address, self.config.prompt_passwords)
-        # TODO: remove following, already taken care in _get_email_password()
+        # TODO: remove following, already taken care in get_email_password()
         # i.e., raise ValueError if no password
         """
         if password is None:
@@ -724,7 +707,7 @@ class CryptoEmail:
                         f"{config['sign']['program']}\n"
             raise ValueError(error_msg)
         gpg = gnupg.GPG(gnupghome=self.config.homedir)
-        passphrase = get_gpg_passphrase(
+        passphrase, credential = get_gpg_passphrase(
             prompt=self.config.prompt_passwords,
             gpg=gpg,
             fingerprint=config['sign']['signature'],
@@ -735,18 +718,22 @@ class CryptoEmail:
                            passphrase=passphrase)
         del passphrase
         if message.status == 'signature created' and \
-                message.fingerprint != self.config.send_emails['sign']['signature']:
-            error_msg = 'The fingerprint used for signing ' \
-                        f'({message.fingerprint}) is different from the one in ' \
-                        'the config ' \
-                        f"({self.config.send_emails['sign']['signature']})\n"
-            raise ValueError(error_msg)
-        elif message.status == 'signature created':
+                message.fingerprint == self.config.send_emails['sign']['signature']:
             logger.info('Message signed')
+            update_gpg_pass(credential, success=True)
             return message
         else:
-            error_msg = f"{message.stderr.strip()}\n"
-            raise ValueError(error_msg)
+            update_gpg_pass(credential, success=False)
+            if message.status == 'signature created' and \
+                    message.fingerprint == self.config.send_emails['sign']['signature']:
+                error_msg = 'The fingerprint used for signing ' \
+                            f'({message.fingerprint}) is different from the ' \
+                            'one in the config ' \
+                            f"({self.config.send_emails['sign']['signature']})\n"
+                raise ValueError(error_msg)
+            else:
+                error_msg = f"{message.stderr.strip()}\n"
+                raise ValueError(error_msg)
 
     def _update_report(test_type):
         def update_decorator(func):
@@ -786,7 +773,7 @@ class CryptoEmail:
         elif connection == CONNECTIONS['password']:
             self.config.connection_method = self.config.smtp_imap
             smtp_config = self.config.connection_method
-            password, credential = self._get_email_password(
+            password, credential = get_email_password(
                 self.config.mailbox_address,
                 self.config.prompt_passwords)
             logger.info(f"Connecting to the smtp server '{smtp_config['smtp_server']}' ...")
@@ -803,8 +790,8 @@ class CryptoEmail:
             logger.error(red(error_msg))
         if result.exit_code == 0:
             if credential:
-                logger.info(violet('Adding email password in keyring for the '
-                            f'username={bold(credential[1])}'))
+                logger.info(violet('Adding email password in the keyring for '
+                                   f'the username={bold(credential[1])}'))
                 keyring.set_password(*credential)
             logger.info(green('Connection successful!\n'))
         elif credential:
@@ -821,11 +808,6 @@ class CryptoEmail:
         try:
             encrypted_message = self._encrypt_message(plaintext_message)
         except ValueError as e:
-            """
-            error_msg = "The message couldn't be encrypted with the " \
-                        "program '{}'\n{}\n".format(
-                            self.config.send_emails['encrypt']['program'], e)
-            """
             error_msg = f'{e}\n'
             logger.error(red(error_msg))
             return result.set_error(error_msg)
@@ -835,7 +817,7 @@ class CryptoEmail:
         logger.info(f'status: {encrypted_message.status}')
         logger.debug(f'stderr:\n{encrypted_message.stderr}')
         gpg = gnupg.GPG(gnupghome=self.config.homedir)
-        passphrase = get_gpg_passphrase(
+        passphrase, credential = get_gpg_passphrase(
             prompt=self.config.prompt_passwords,
             gpg=gpg,
             fingerprint=self.config.send_emails['encrypt']['recipient_userid'],
@@ -855,11 +837,13 @@ class CryptoEmail:
         if plaintext_message == decrypted_message.data.decode():
             logger.info(green('Encryption/decryption successful!\n'))
             result.set_success()
+            update_gpg_pass(credential, success=True)
         else:
             error_msg = "The message couldn't be decrypted " \
                         f"correctly\n{decrypted_message.stderr}"
             logger.error(red(error_msg))
             result.set_error(error_msg)
+            update_gpg_pass(credential, success=False)
         return result
 
     @_update_report('testing signing')

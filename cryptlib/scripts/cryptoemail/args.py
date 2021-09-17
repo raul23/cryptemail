@@ -150,14 +150,39 @@ def init_list(list_):
     return [] if list_ is None else list_
 
 
+class ArgumentParser(argparse.ArgumentParser):
+    def _get_action_from_name(self, name):
+        """Given a name, get the Action instance registered with this parser.
+        If only it were made available in the ArgumentError object. It is
+        passed as it's first arg...
+        """
+        container = self._actions
+        if name is None:
+            return None
+        for action in container:
+            if '/'.join(action.option_strings) == name:
+                return action
+            elif action.metavar == name:
+                return action
+            elif action.dest == name:
+                return action
+
+    def error(self, message):
+        # self.print_help(sys.stderr)
+        # self.usage
+        self.exit(2, '\n%s: error: %s\n' % (self.prog, red(message)))
+
+
 def setup_argparser():
     # Setup the parser
     width = os.get_terminal_size().columns - 5
-    parser = argparse.ArgumentParser(
-        usage=main_usage(__file__),
+    # parser = argparse.ArgumentParser(
+    parser = ArgumentParser(
+        usage=main_usage(cryptlib.__project_name__),
         description="Command-line program for sending and reading "
                     "encrypted emails.",
         add_help=False,
+        prog=cryptlib.__project_name__,
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     general_group = parser.add_argument_group(f"{yellow('General options')}")
@@ -190,7 +215,8 @@ def setup_argparser():
            "log files)."
     parser_test = subparsers.add_parser(
         subcommand,
-        usage=subcommand_usage(__file__, subcommand),
+        prog=cryptlib.__project_name__,
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
         description=desc,
         add_help=False,
         help='Uninstall the program.',
@@ -209,7 +235,8 @@ def setup_argparser():
     subcommand = 'edit'
     parser_test = subparsers.add_parser(
         subcommand,
-        usage=subcommand_usage(__file__, subcommand),
+        prog=cryptlib.__project_name__,
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
         description='Edit or reset the configuration file.',
         add_help=False,
         help='Edit/reset the configuration file.',
@@ -238,7 +265,8 @@ def setup_argparser():
     subcommand = 'test'
     parser_test = subparsers.add_parser(
         subcommand,
-        usage=subcommand_usage(__file__, subcommand),
+        prog=cryptlib.__project_name__,
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
         description='Run tests as defined in the config file.',
         add_help=False,
         help='Run tests.',
@@ -277,7 +305,8 @@ def setup_argparser():
     subcommand = 'send'
     parser_send = subparsers.add_parser(
         subcommand,
-        usage=subcommand_usage(__file__, subcommand),
+        prog=cryptlib.__project_name__,
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
         description='Send a signed and/or encrypted email.',
         add_help=False,
         help='Send an encrypted email.',
@@ -305,7 +334,8 @@ def setup_argparser():
     subcommand = 'read'
     parser_read = subparsers.add_parser(
         subcommand,
-        usage=subcommand_usage(__file__, subcommand),
+        prog=cryptlib.__project_name__,
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
         description='Read emails from your inbox which might contain '
                     'unencrypted and encrypted emails.',
         add_help=False,
@@ -324,7 +354,9 @@ def setup_argparser():
     subcommand = 'update'
     parser_update = subparsers.add_parser(
         subcommand,
-        usage=subcommand_usage(__file__, subcommand),
+        prog=cryptlib.__project_name__,
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand,
+                               required_args='-u USERNAME'),
         description='Update keyring (i.e. email password or GPG passphrase).',
         add_help=False,
         help='Update keyring.',

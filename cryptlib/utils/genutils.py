@@ -364,8 +364,8 @@ def main_usage(script_filename):
     return blue(f'{prog_name(script_filename)} [-h] [-v] subcommand ...')
 
 
-def subcommand_usage(script_filename, subcommand):
-    return blue(f'{prog_name(script_filename)} {subcommand} [OPTIONS]')
+def subcommand_usage(script_filename, subcommand, required_args=''):
+    return blue(f'{prog_name(script_filename)} {subcommand} [OPTIONS] {required_args}')
 
 
 def blue(msg):

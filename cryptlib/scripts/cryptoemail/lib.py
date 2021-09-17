@@ -9,11 +9,14 @@ from secrets import choice
 from googleapiclient import errors
 import keyring
 
-from cryptlib.utils.genutils import yellow
+import cryptlib
+from cryptlib.utils.genutils import blue, bold, violet, yellow
 from cryptlib.utils.logutils import Logger
-from script import KEYRING_SERVICE_GPG_PASS
 
 logger = Logger(__name__, __file__)
+
+KEYRING_SERVICE_EMAIL_PASS = f'{cryptlib.__project_name__}.email_password'
+KEYRING_SERVICE_GPG_PASS = f'{cryptlib.__project_name__}.gpg_passphrase'
 
 
 class Result:
@@ -84,7 +87,30 @@ def generate_random_string(n=10):
     return ''.join([choice(string.ascii_uppercase + string.digits) for _ in range(n)])
 
 
+def get_email_password(email_account, prompt=False):
+    credential = None
+    keyring_username = email_account
+    password = keyring.get_password(KEYRING_SERVICE_EMAIL_PASS, keyring_username)
+    if password:
+        logger.debug('Email password retrieved from keyring')
+    else:
+        logger.debug("No email password could be found in the keyring")
+        if prompt:
+            print(blue(f'Enter email password for {bold(email_account)}'))
+            password = prompt_password(
+                prompt='Email password (will not be echoed): ',
+                prompt_verify='Enter password again (will not be echoed): ')
+            credential = (KEYRING_SERVICE_EMAIL_PASS, keyring_username, password)
+        if not password:
+            if not prompt:
+                logger.warning(yellow('prompt_passwords = False'))
+            raise ValueError("No email password could be retrieved from the "
+                             f"keyring for {bold(email_account)}")
+    return password, credential
+
+
 def get_gpg_passphrase(prompt=False, gpg=None, fingerprint=None, message=None):
+    credential = None
     if gpg and fingerprint:
         logger.debug('Checking if the passphrase is already cached '
                      '(by gpg-agent)')
@@ -94,36 +120,35 @@ def get_gpg_passphrase(prompt=False, gpg=None, fingerprint=None, message=None):
                                      passphrase=generate_random_string())
         if msg == decrypted_data.data.decode():
             logger.info("The GPG passphrase is already cached")
-            return None
+            return None, credential
     conf_path = os.path.join(gpg.gnupghome, 'gpg-agent.conf')
     if os.path.exists(conf_path):
         with open(conf_path, 'r') as f:
             conf_data = f.read()
         found = re.search('^(pinentry-program)', conf_data, re.MULTILINE)
         if found:
-            logger.debug('pinentry might be used for entering the passphrase')
+            logger.debug('pinentry will be used for retrieving the passphrase')
             # if not saved in keyring
-            return None
-    keyring_username = f'{fingerprint}'
+            return None, credential
+    keyring_username = fingerprint
     passphrase = keyring.get_password(KEYRING_SERVICE_GPG_PASS, keyring_username)
     if passphrase:
         logger.debug('GPG passphrase retrieved from keyring')
     else:
-        logger.debug("A GPG passphrase couldn't be found saved locally")
+        logger.debug("No GPG passphrase could be found in the keyring")
         if prompt:
             if message:
                 print(message)
             passphrase = prompt_password(
                 prompt='GPG passphrase (will not be echoed): ',
                 prompt_verify='Verify passphrase (will not be echoed): ')
-            keyring.set_password(KEYRING_SERVICE_GPG_PASS, keyring_username,
-                                 passphrase)
+            credential = (KEYRING_SERVICE_GPG_PASS, keyring_username, passphrase)
         if not passphrase:
             if not prompt:
                 logger.warning(yellow('prompt_passwords = False'))
-            raise ValueError('No GPG passphrase could be retrieved for '
-                             f'fingerprint={fingerprint}')
-    return passphrase
+            raise ValueError('No GPG passphrase could be retrieved from the '
+                             f'keyring for fingerprint={fingerprint}')
+    return passphrase, credential
 
 
 def process_returned_values(returned_values):
@@ -174,3 +199,19 @@ def send_message(service, user_id, message):
         return message
     except errors.HttpError as e:
         print(f'An error occurred: {e}')
+
+
+def update_gpg_pass(credential, success):
+    if not credential:
+        return 1
+    if success:
+        logger.info(violet('Adding GPG passphrase in the keyring for '
+                           f'the fingerprint={bold(credential[1])}'))
+        keyring.set_password(*credential)
+        return 0
+    else:
+        warning_msg = "The GPG passphrase could not be added in the " \
+                      "keyring for the " \
+                      f"fingerprint={bold(credential[1])}\n"
+        logger.warning(yellow(warning_msg))
+        return 0
