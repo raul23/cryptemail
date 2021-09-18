@@ -43,34 +43,6 @@ class CryptoEmail:
         self.tester = Tester()
         self._missing_data = False
 
-    def _update_keyring(self):
-        result = Result()
-        if self.config.email_password:
-            service = KEYRING_SERVICE_EMAIL_PASS
-            enter_msg = 'Enter the new email password'
-            prompt = 'Email password (will not be echoed): '
-            prompt_verify = 'Verify password (will not be echoed): '
-            success_msg = 'Successful password update!'
-        else:
-            service = KEYRING_SERVICE_GPG_PASS
-            enter_msg = 'Enter the new GPG passphrase'
-            prompt = 'GPG passphrase (will not be echoed): '
-            prompt_verify = 'Verify GPG passphrase (will not be echoed): '
-            success_msg = 'Successful passphrase update!'
-        old_password = keyring.get_password(service, self.config.username)
-        if not old_password:
-            error_msg = "Couldn't find the account associated with the " \
-                        f"username='{self.config.username}' in the keyring"
-            self._log_error(error_msg)
-            return result.set_error(error_msg)
-        print(blue(enter_msg))
-        password = prompt_password(prompt, prompt_verify)
-        keyring.set_password(service, self.config.username, password)
-        logger.info(green(success_msg))
-        time.sleep(1)
-        result.set_success()
-        return result
-
     def run(self):
         try:
             self._interact()
@@ -93,10 +65,10 @@ class CryptoEmail:
                     ans = self._input('Choice', values=['1', '2'])
                     print('')
                 if self.config.email_password or ans == '1':
-                    logger.info('Updating the email password ...')
+                    logger.info('Change the email password')
                     self.config.email_password = True
                 else:
-                    logger.info('Updating the GPG passphrase ...')
+                    logger.info('Change the GPG passphrase')
                     self.config.gpg_passphrase = True
                 if ans:
                     time.sleep(0.5)
@@ -877,6 +849,44 @@ class CryptoEmail:
                         f"signed\n{verify.stderr}\n"
             logger.error(red(error_msg))
             result.set_error(error_msg)
+        return result
+
+    def _update_keyring(self):
+        result = Result()
+        if self.config.email_password:
+            service = KEYRING_SERVICE_EMAIL_PASS
+            enter_old_pass_msg = 'Enter the OLD email password'
+            enter_new_pass_msg = 'Enter the NEW email password'
+            prompt = 'New email password (will not be echoed): '
+            prompt_verify = 'Confirm new password (will not be echoed): '
+            success_msg = 'Successful password update!'
+        else:
+            service = KEYRING_SERVICE_GPG_PASS
+            enter_old_pass_msg = 'Enter the OLD email password'
+            enter_new_pass_msg = 'Enter the NEW GPG passphrase'
+            prompt = 'GPG passphrase (will not be echoed): '
+            prompt_verify = 'Verify GPG passphrase (will not be echoed): '
+            success_msg = 'Successful passphrase update!'
+        old_password1 = keyring.get_password(service, self.config.username)
+        if not old_password1:
+            error_msg = "Couldn't find the account associated with the " \
+                        f"username='{self.config.username}' in the keyring"
+            self._log_error(error_msg)
+            return result.set_error(error_msg)
+        print(blue(enter_old_pass_msg))
+        old_password2 = prompt_password(prompt, prompt_verify, verify=False)
+        if old_password1 != old_password2:
+            error_msg = "Old password isn't valid!"
+            self._log_error(error_msg)
+            return result.set_error(error_msg)
+        print('')
+        print(blue(enter_new_pass_msg))
+        password = prompt_password(prompt, prompt_verify)
+        keyring.set_password(service, self.config.username, password)
+        print('')
+        logger.info(green(success_msg))
+        time.sleep(1)
+        result.set_success()
         return result
 
 
