@@ -413,7 +413,9 @@ class CryptoEmail:
     def _input_missing_data(self, opt_name, opt_value=None, values=None,
                             lower=False, is_path=False, is_userid=False,
                             is_address=False, is_server=False):
-        if not self.config.interactive and opt_value:
+        if not self.config.interactive:
+            if opt_value is None:
+                raise ValueError('opt_value is None')
             error_msg = f'invalid data => {opt_name}={opt_value}'
             raise InvalidDataError(error_msg)
         if not self._missing_data:
