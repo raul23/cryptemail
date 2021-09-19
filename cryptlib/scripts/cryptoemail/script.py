@@ -30,7 +30,6 @@ logger = Logger(__name__, __file__)
 CONFIG_PATH = os.path.join(cryptlib.__project_dir__, CFG_TYPES['main']['user'])
 LOGGING_PATH = os.path.join(cryptlib.__project_dir__, CFG_TYPES['log']['user'])
 
-
 # The file token.json stores the user's access and refresh tokens, and is
 # created automatically when the authorization flow completes for the first
 # time.
