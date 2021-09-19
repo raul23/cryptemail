@@ -34,7 +34,7 @@ LOGGING_PATH = os.path.join(cryptlib.__project_dir__, CFG_TYPES['log']['user'])
 # The file token.json stores the user's access and refresh tokens, and is
 # created automatically when the authorization flow completes for the first
 # time.
-TOKENS_FILENAME = 'token.json'
+TOKENS_FILENAME = 'tokens.json'
 
 
 class InvalidDataError(Exception):
