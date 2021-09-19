@@ -151,22 +151,6 @@ def init_list(list_):
 
 
 class ArgumentParser(argparse.ArgumentParser):
-    def _get_action_from_name(self, name):
-        """Given a name, get the Action instance registered with this parser.
-        If only it were made available in the ArgumentError object. It is
-        passed as it's first arg...
-        """
-        container = self._actions
-        if name is None:
-            return None
-        for action in container:
-            if '/'.join(action.option_strings) == name:
-                return action
-            elif action.metavar == name:
-                return action
-            elif action.dest == name:
-                return action
-
     def error(self, message):
         # self.print_help(sys.stderr)
         # self.usage
@@ -366,13 +350,41 @@ def setup_argparser():
                         remove_opts=['homedir', 'interactive', 'prompt_passwords'])
     parser_update_group = parser_update.add_argument_group(
         title=f"{yellow('Update options')}")
-    parser_update_group.add_argument('-e', '--email-password', dest='email_password',
+    update_mutual_group = parser_update_group.add_mutually_exclusive_group()
+    update_mutual_group.add_argument('-e', '--email-password', dest='email_password',
                                      action='store_true',
                                      help='Update email password saved in keyring.')
-    parser_update_group.add_argument('-g', '--gpg-passphrase', dest='gpg_passphrase',
+    update_mutual_group.add_argument('-g', '--gpg-passphrase', dest='gpg_passphrase',
                                      action='store_true',
                                      help='Update GPG password saved in keyring.')
     parser_update_group.add_argument('-u', '--username', dest='username', required=True,
                                      help='Username.')
-    # TODO: mutual excl between gpg_passphrase and email_password
+    # ==============
+    # Delete options
+    # ==============
+    # create the parser for the "delete" command
+    subcommand = 'delete'
+    parser_delete = subparsers.add_parser(
+        subcommand,
+        prog=cryptlib.__project_name__,
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand,
+                               required_args='-u USERNAME'),
+        description='Delete account in keyring (i.e. email or GPG account).',
+        add_help=False,
+        help='Delete account in keyring.',
+        formatter_class=lambda prog: MyFormatter(
+            prog, max_help_position=50, width=width))
+    add_general_options(parser_delete,
+                        remove_opts=['homedir', 'interactive', 'prompt_passwords'])
+    parser_delete_group = parser_delete.add_argument_group(
+        title=f"{yellow('Delete options')}")
+    delete_mutual_group = parser_delete_group.add_mutually_exclusive_group()
+    delete_mutual_group.add_argument('-e', '--email-account', dest='email_account',
+                                     action='store_true',
+                                     help='Delete email account saved in keyring.')
+    delete_mutual_group.add_argument('-g', '--gpg-account', dest='gpg_account',
+                                     action='store_true',
+                                     help='Delete GPG account saved in keyring.')
+    parser_delete_group.add_argument('-u', '--username', dest='username', required=True,
+                                     help='Username.')
     return parser

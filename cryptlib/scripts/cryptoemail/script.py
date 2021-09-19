@@ -14,7 +14,6 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 
-import cryptlib
 from args import CONNECTIONS, setup_argparser
 from cryptlib.configs import default_config
 from cryptlib.utils.genutils import *
@@ -57,10 +56,27 @@ class CryptoEmail:
                 return self._send_email().exit_code
             if self.config.subcommand == 'read':
                 return self._read_emails()
+            if self.config.subcommand == 'delete':
+                ans = None
+                if not self.config.email_password and not self.config.gpg_passphrase:
+                    print(blue('What kind of do you want to update in keyring?'))
+                    print(blue('(1) Email password\n(2) GPG passphrase'))
+                    ans = self._input('Choice', values=['1', '2'])
+                    print('')
+                if self.config.email_password or ans == '1':
+                    logger.info('Change the email password')
+                    self.config.email_password = True
+                else:
+                    logger.info('Change the GPG passphrase')
+                    self.config.gpg_passphrase = True
+                if ans:
+                    time.sleep(0.5)
+                print('')
+                return self._delete_account_from_keyring().exit_code
             if self.config.subcommand == 'update':
                 ans = None
                 if not self.config.email_password and not self.config.gpg_passphrase:
-                    print(blue('What do you want to update in keyring?'))
+                    print(blue('What do you want to update in the keyring?'))
                     print(blue('(1) Email password\n(2) GPG passphrase'))
                     ans = self._input('Choice', values=['1', '2'])
                     print('')
@@ -245,6 +261,45 @@ class CryptoEmail:
                 token.write(creds.to_json())
         service = build('gmail', 'v1', credentials=creds)
         return service
+
+    def _delete_account_from_keyring(self):
+        result = Result()
+        if self.config.email_password:
+            service = KEYRING_SERVICE_EMAIL_PASS
+            enter_old_pass_msg = 'Enter the OLD email password'
+            enter_new_pass_msg = 'Enter the NEW email password'
+            prompt = 'New email password (will not be echoed): '
+            prompt_verify = 'Confirm new password (will not be echoed): '
+            success_msg = 'Successful password update!'
+        else:
+            service = KEYRING_SERVICE_GPG_PASS
+            enter_old_pass_msg = 'Enter the OLD email password'
+            enter_new_pass_msg = 'Enter the NEW GPG passphrase'
+            prompt = 'GPG passphrase (will not be echoed): '
+            prompt_verify = 'Verify GPG passphrase (will not be echoed): '
+            success_msg = 'Successful passphrase update!'
+        old_password1 = keyring.get_password(service, self.config.username)
+        if not old_password1:
+            error_msg = "Couldn't find the account associated with the " \
+                        f"username='{self.config.username}' in the keyring"
+            self._log_error(error_msg)
+            return result.set_error(error_msg)
+        print(blue(enter_old_pass_msg))
+        old_password2 = prompt_password(prompt, prompt_verify, verify=False)
+        if old_password1 != old_password2:
+            error_msg = "Old password isn't valid!"
+            print('')
+            self._log_error(error_msg)
+            return result.set_error(error_msg)
+        print('')
+        print(blue(enter_new_pass_msg))
+        password = prompt_password(prompt, prompt_verify, newline=True)
+        keyring.set_password(service, self.config.username, password)
+        print('')
+        logger.info(green(success_msg))
+        time.sleep(1)
+        result.set_success()
+        return result
 
     def _encrypt_message(self, unencrypted_msg, sign=None):
         config = self.config.send_emails
@@ -487,6 +542,7 @@ class CryptoEmail:
         else:
             return 0
 
+    # TODO: change param name from nl to newline?
     def _log_error(self, error, nl=False):
         if self.config.verbose:
             error_msg = f'{traceback.format_exc()}'.strip()
@@ -877,11 +933,12 @@ class CryptoEmail:
         old_password2 = prompt_password(prompt, prompt_verify, verify=False)
         if old_password1 != old_password2:
             error_msg = "Old password isn't valid!"
+            print('')
             self._log_error(error_msg)
             return result.set_error(error_msg)
         print('')
         print(blue(enter_new_pass_msg))
-        password = prompt_password(prompt, prompt_verify)
+        password = prompt_password(prompt, prompt_verify, newline=True)
         keyring.set_password(service, self.config.username, password)
         print('')
         logger.info(green(success_msg))

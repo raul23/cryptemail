@@ -172,13 +172,15 @@ def process_returned_values(returned_values):
 
 def prompt_password(prompt='Enter password (will not be echoed): ',
                     prompt_verify='Verify password (will not be echoed: ',
-                    verify=True):
+                    verify=True, newline=False):
     password1 = getpass.getpass(prompt=prompt)
     if verify:
         password2 = getpass.getpass(prompt=prompt_verify)
         if password1 == password2:
             return password1
         else:
+            if newline:
+                print('')
             raise ValueError('password verification failed!')
     return password1
 
