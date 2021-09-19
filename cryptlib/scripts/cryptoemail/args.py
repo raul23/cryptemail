@@ -346,7 +346,7 @@ def setup_argparser():
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_update,
-                        remove_opts=['homedir', 'prompt_passwords'])
+                        remove_opts=['homedir', 'interactive', 'prompt_passwords', 'quiet'])
     parser_update_key_group = parser_update.add_argument_group(
         title=f"{yellow('Update keyring options')}")
     update_mutual_group = parser_update_key_group.add_mutually_exclusive_group()
@@ -381,7 +381,7 @@ def setup_argparser():
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_delete,
-                        remove_opts=['homedir', 'interactive', 'prompt_passwords'])
+                        remove_opts=['homedir', 'interactive', 'prompt_passwords', 'quiet'])
     parser_delete_group = parser_delete.add_argument_group(
         title=f"{yellow('Delete options')}")
     delete_mutual_group = parser_delete_group.add_mutually_exclusive_group()
