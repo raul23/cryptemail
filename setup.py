@@ -58,7 +58,7 @@ with open(os.path.join(dirpath, "requirements.txt")) as f:
     REQUIREMENTS = f.read().splitlines()
 """
 
-setup(name='cryptoemail',
+setup(name='cryptemail',
       version=VERSION,
       description='Command-line program for sending and receiving encrypted '
                   'emails.',
@@ -76,7 +76,7 @@ setup(name='cryptoemail',
         'Topic :: Utilities'
       ],
       keywords='encryption cryptography email pgp gnupg',
-      url='https://github.com/raul23/cryptoemail',
+      url='https://github.com/raul23/cryptemail',
       author='R',
       license='GPLv3',
       python_requires=f'>={major}.{minor}',
@@ -84,10 +84,10 @@ setup(name='cryptoemail',
       cmdclass={'build_py': build_py},
       include_package_data=True,
       entry_points={
-        'console_scripts': ['cryptoemail=cryptlib.scripts.cryptoemail:main']
+        'console_scripts': ['cryptemail=cryptlib.scripts.cryptemail:main']
       },
       project_urls={  # Optional
-          'Bug Reports': 'https://github.com/raul23/cryptoemail/issues',
-          'Source': 'https://github.com/raul23/cryptoemail',
+          'Bug Reports': 'https://github.com/raul23/cryptemail/issues',
+          'Source': 'https://github.com/raul23/cryptemail',
       },
       zip_safe=False)

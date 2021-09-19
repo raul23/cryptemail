@@ -91,13 +91,13 @@ logging = {
           'handlers': ['console', 'file'],
           'propagate': False
         },
-        'cryptoemail.script':
+        'cryptemail.script':
         {
           'level': 'INFO',
           'handlers': ['console', 'file'],
           'propagate': False
         },
-        'cryptoemail.lib':
+        'cryptemail.lib':
         {
             'level': 'INFO',
             'handlers': ['console', 'file'],

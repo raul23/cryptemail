@@ -40,7 +40,7 @@ class InvalidDataError(Exception):
     """Raised if TODO..."""
 
 
-class CryptoEmail:
+class CryptEmail:
     def __init__(self, config):
         self.config = config
         self._check_args()
@@ -1042,7 +1042,7 @@ def main():
         if main_cfg.subcommand == 'uninstall':
             logger.info('Uninstalling program ...')
         else:
-            exit_code = CryptoEmail(main_cfg).run()
+            exit_code = CryptEmail(main_cfg).run()
     except KeyboardInterrupt:
         logger.debug('Ctrl+c detected!')
         exit_code = 2
