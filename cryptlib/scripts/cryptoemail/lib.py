@@ -10,7 +10,7 @@ from googleapiclient import errors
 import keyring
 
 import cryptlib
-from cryptlib.utils.genutils import blue, bold, violet, yellow
+from cryptlib.utils.genutils import blue, bold, red, violet, yellow
 from cryptlib.utils.logutils import Logger
 
 logger = Logger(__name__, __file__)
@@ -200,10 +200,12 @@ def send_message(service, user_id, message):
     """
     try:
         message = (service.users().messages().send(userId=user_id, body=message).execute())
-        print(f"Message Id: {message['id']}")
+        logger.info(f"Message Id: {violet(message['id'])}")
         return message
     except errors.HttpError as e:
-        print(f'An error occurred: {e}')
+        # TODO: raise?
+        # print(f'An error occurred: {e}')
+        logger.error(red(f'An error occurred: {e}'))
 
 
 def update_gpg_pass(credential, success):
