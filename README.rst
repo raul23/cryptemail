@@ -1,6 +1,6 @@
-===========
-cryptoemail
-===========
+==========
+cryptemail
+==========
 
 .. raw:: html
 
