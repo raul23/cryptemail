@@ -340,13 +340,13 @@ def setup_argparser():
         subcommand,
         prog=cryptlib.__project_name__,
         usage=subcommand_usage(cryptlib.__project_name__, subcommand),
-        description='Update a googleapi token or the keyring (i.e. email password or GPG passphrase).',
+        description='Update the googleapi tokens or the keyring (i.e. email password or GPG passphrase).',
         add_help=False,
-        help='Update the keyring or a googleapi token.',
+        help='Update the keyring or googleapi tokens.',
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_update,
-                        remove_opts=['homedir', 'interactive', 'prompt_passwords'])
+                        remove_opts=['homedir', 'prompt_passwords'])
     parser_update_key_group = parser_update.add_argument_group(
         title=f"{yellow('Update keyring options')}")
     update_mutual_group = parser_update_key_group.add_mutually_exclusive_group()
@@ -359,9 +359,12 @@ def setup_argparser():
     parser_update_key_group.add_argument('-u', '--username', dest='username',
                                          help='Username.')
     parser_update_token_group = parser_update.add_argument_group(
-        title=f"{yellow('Update googleapi token options')}")
-    parser_update_token_group.add_argument('-t', '--token', dest='token', metavar='PATH',
-                                           help='Update a googleapi token if it has been expired or revoked.')
+        title=f"{yellow('Update the googleapi tokens options')}")
+    parser_update_token_group.add_argument('-t', '--tokens', dest='tokens', action='store_true',
+                                           help='Update the googleapi tokens if they have been expired or revoked.')
+    parser_update_token_group.add_argument(
+        '-d', '--directory', metavar='PATH', dest='tokens_dirpath',
+        help="Directory path containing the tokens and credentials files (JSON).")
     # ==============
     # Delete options
     # ==============

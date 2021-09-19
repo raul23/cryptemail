@@ -180,7 +180,7 @@ def prompt_password(prompt='Enter password (will not be echoed): ',
             return password1
         else:
             if newline:
-                print('')
+                print()
             raise ValueError('password verification failed!')
     return password1
 
@@ -211,7 +211,7 @@ def update_gpg_pass(credential, success):
         return 1
     if success:
         logger.info(violet('Adding GPG passphrase in the keyring for '
-                           f'the fingerprint {bold(credential[1])}'))
+                           f'the fingerprint {bold(credential[1])}\n'))
         keyring.set_password(*credential)
         return 0
     else:

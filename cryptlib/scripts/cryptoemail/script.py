@@ -15,7 +15,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 
 from args import CONNECTIONS, setup_argparser
-from cryptlib.configs import default_config
+from cryptlib.configs import default_config, default_logging
 from cryptlib.utils.genutils import *
 from lib import *
 
@@ -25,6 +25,16 @@ logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 logging.getLogger('gnupg').setLevel(logging.ERROR)
 
 logger = Logger(__name__, __file__)
+
+# Configuration files within project directory
+CONFIG_PATH = os.path.join(cryptlib.__project_dir__, CFG_TYPES['main']['user'])
+LOGGING_PATH = os.path.join(cryptlib.__project_dir__, CFG_TYPES['log']['user'])
+
+
+# The file token.json stores the user's access and refresh tokens, and is
+# created automatically when the authorization flow completes for the first
+# time.
+TOKENS_FILENAME = 'token.json'
 
 
 class InvalidDataError(Exception):
@@ -45,22 +55,25 @@ class CryptoEmail:
     def run(self):
         try:
             self._interact()
-        except Exception as e:
-            self._log_error(e)
-            return 1
-        # ===========
-        # Subcommands
-        # ===========
-        try:
+            # ==============================
+            # Subcommands (excluding 'test')
+            # ==============================
             if self.config.subcommand == 'send':
                 return self._send_email().exit_code
             if self.config.subcommand == 'read':
-                return self._read_emails()
+                return self._read_emails().exit_code
+            if self.config.subcommand == 'update' and self.config.tokens:
+                return self._update_token().exit_code
             if self.config.subcommand in ['delete', 'update']:
-                self._delete_or_update()
+                return self._delete_or_update_keyring().exit_code
+        except EOFError:
+            raise
         except Exception as e:
             self._log_error(e)
             return 1
+        # ================
+        # Subcommand: test
+        # ================
         if self.config.subcommand == 'test':
             if self.config.run_tests:
                 self._run_tests()
@@ -152,12 +165,14 @@ class CryptoEmail:
                  getattr(self.config, 'args_test_signature', None) is not None):
             logger.warning(yellow('Only tests from the config file will be '
                                   'executed!'))
-            self._setattrs(attrs)
-        attrs.append('run_tests')
+            # Set all attributes in `attrs` to None
+            self._setattrs(attrs, None)
+        attrs.extend(['run_tests', 'tokens_dirpath'])
         self._create_attrs(attrs)
 
     def _create_attrs(self, attrs):
         for attr in attrs:
+            # If attr doesn't exist, create it and set it to None
             if getattr(self.config, attr, None) is None:
                 logger.debug(f'{attr} = None')
                 setattr(self.config, attr, None)
@@ -200,15 +215,12 @@ class CryptoEmail:
                         "TOKEN-based authentication"
             raise ValueError(error_msg)
         if not os.path.exists(credentials_path):
-            error_msg = "The path to the credentials doesn't exist: " \
-                        f"{credentials_path}"
+            error_msg = "The directory path containing the credentials " \
+                        f"doesn't exist: {credentials_path}"
             raise ValueError(error_msg)
         creds = None
-        # The file token.json stores the user's access and refresh tokens, and is
-        # created automatically when the authorization flow completes for the first
-        # time.
         dirname = os.path.dirname(credentials_path)
-        tokens_path = os.path.join(dirname, 'token.json')
+        tokens_path = os.path.join(dirname, TOKENS_FILENAME)
         if os.path.exists(tokens_path):
             creds = Credentials.from_authorized_user_file(tokens_path, scopes)
         # If there are no (valid) credentials available, let the user log in.
@@ -250,17 +262,21 @@ class CryptoEmail:
         password2 = prompt_password(prompt, prompt_verify, newline=True)
         if password1 != password2:
             error_msg = "Password isn't valid!"
-            print('')
+            print()
             self._log_error(error_msg)
             return result.set_error(error_msg)
-        print('')
+        print()
         keyring.delete_password(service, self.config.username)
         logger.info(green(success_msg))
         time.sleep(0.5)
         result.set_success()
         return result
 
-    def _delete_or_update(self):
+    def _delete_or_update_keyring(self):
+        if not self.config.username:
+            error_msg = 'The following arguments are required: -u/--username'
+            logger.error(red(error_msg))
+            return Result().set_error(error_msg)
         if self.config.subcommand == 'delete':
             email_arg = self.config.email_account
             gpg_arg = self.config.gpg_account
@@ -270,10 +286,6 @@ class CryptoEmail:
             gpg_arg = self.config.gpg_passphrase
             op_func = self._update_keyring
         ans = None
-        if not self.config.username:
-            error_msg = 'The following arguments are required: -u/--username'
-            logger.error(red(error_msg))
-            return 1
         if not email_arg and not gpg_arg:
             if self.config.subcommand == 'delete':
                 print(blue('What kind of account do you want to delete in the keyring?'))
@@ -282,26 +294,34 @@ class CryptoEmail:
                 print(blue('What do you want to update in the keyring?'))
                 print(blue('(1) Email password\n(2) GPG passphrase'))
             ans = self._input('Choice', values=['1', '2'])
-            print('')
+            print()
             if ans == '1':
                 email_arg = True
+                if self.config.subcommand == 'delete':
+                    self.config.email_account = True
+                else:
+                    self.config.email_password = True
             else:
                 gpg_arg = True
+                if self.config.subcommand == 'delete':
+                    self.config.gpg_account = True
+                else:
+                    self.config.gpg_passphrase = True
         account = violet(self.config.username)
         if email_arg:
             if self.config.subcommand == 'delete':
                 logger.info(f'Delete the email account {account}')
             else:
-                logger.info(f'Update an email password for the username {account}')
+                logger.info(f'Update the email password for the username {account}')
         else:
             if self.config.subcommand == 'delete':
                 logger.info(f'Delete the GPG account {account}')
             else:
-                logger.info(f'Update a GPG passphrase for the account {account}')
+                logger.info(f'Update the GPG passphrase for the account {account}')
         if ans:
             time.sleep(0.5)
-        print('')
-        return op_func().exit_code
+        print()
+        return op_func()
 
     def _encrypt_message(self, unencrypted_msg, sign=None):
         config = self.config.send_emails
@@ -351,6 +371,7 @@ class CryptoEmail:
                 logger.info('Message encrypted')
                 update_gpg_pass(credential, success=True)
             else:
+                # case: invalid password entered twice
                 update_gpg_pass(credential, success=False)
                 error_msg = f"Status from encrypt(): {status}\n" \
                             f"{stderr}"
@@ -450,8 +471,8 @@ class CryptoEmail:
         if not self._missing_data:
             print(blue('\nEnter the following data'))
             self._missing_data = True
-        self._input(opt_name, values, lower, is_path, is_userid, is_address,
-                    is_server)
+        return self._input(opt_name, values, lower, is_path, is_userid,
+                           is_address, is_server)
 
     def _interact(self):
         if (self.config.run_tests and (self.config.test_encryption or self.config.test_signature)) or \
@@ -478,13 +499,13 @@ class CryptoEmail:
                     'signature',
                     self.config.send_emails['sign']['signature'],
                     is_userid=True)
-        if (self.config.run_tests and self.config.test_connection) or \
-                self.config.args_test_connection or self.config.subcommand in ['send', 'read']:
-            if self.config.subcommand not in ['send', 'read'] and \
-                    self.config.connection_method == 'googleapi':
+        test_cond = (self.config.run_tests and self.config.test_connection) or self.config.args_test_connection
+        if test_cond or self.config.subcommand in ['send', 'read', 'update']:
+            if test_cond and self.config.connection_method == 'googleapi':
                 logger.debug("mailbox_address not necessary since just testing "
                              "connection and 'connection_method=googleapi'")
-            elif self.config.mailbox_address == default_config.mailbox_address:
+            elif self.config.subcommand != 'update' and \
+                    self.config.mailbox_address == default_config.mailbox_address:
                 self.config.mailbox_address = self._input_missing_data(
                     'mailbox_address',
                     self.config.mailbox_address,
@@ -525,7 +546,7 @@ class CryptoEmail:
                             self.config.send_emails['receiver_email_address'],
                             is_address=True)
         if self._missing_data and self.config.interactive:
-            print('')
+            print()
             self._missing_data = False
 
     @staticmethod
@@ -579,7 +600,9 @@ class CryptoEmail:
 
     def _read_emails(self):
         logger.info(blue('### Reading emails ###'))
-        return 0
+        result = Result()
+        result.set_success()
+        return result
 
     def _run_tests(self):
         logger.info('Running tests from config file ...\n')
@@ -728,10 +751,11 @@ class CryptoEmail:
             self._log_error(error_msg)
             return result.set_error(error_msg)
 
-    def _setattrs(self, attrs):
+    # Set all attributes in `attrs` to value
+    def _setattrs(self, attrs, value):
         for attr in attrs:
-            logger.debug(f'{attr} = None')
-            setattr(self.config, attr, None)
+            logger.debug(f'{attr} = {value}')
+            setattr(self.config, attr, value)
 
     # TODO: provide signature fingerprint as param?
     def _sign_message(self, message_text):
@@ -944,35 +968,71 @@ class CryptoEmail:
         old_password2 = prompt_password(prompt_old, prompt_verify, verify=False)
         if old_password1 != old_password2:
             error_msg = "Old password isn't valid!"
-            print('')
+            print()
             self._log_error(error_msg)
             return result.set_error(error_msg)
-        print('')
+        print()
         print(blue(enter_new_pass_msg))
         password = prompt_password(prompt_new, prompt_verify, newline=True)
         keyring.set_password(service, self.config.username, password)
-        print('')
+        print()
         logger.info(green(success_msg))
         time.sleep(0.5)
         result.set_success()
         return result
+
+    def _update_token(self):
+        logger.info('Update the googleapi tokens')
+        result = Result()
+        if self.config.tokens_dirpath:
+            if os.path.isdir(self.config.tokens_dirpath):
+                tokens_dirpath = self.config.tokens_dirpath
+            else:
+                error_msg = f'{bold(self.config.tokens_dirpath)} is not a directory'
+                self._log_error(error_msg)
+                return result.set_error(error_msg)
+        else:
+            if os.path.exists(self.config.googleapi['credentials_path']):
+                tokens_dirpath = os.path.dirname(self.config.googleapi['credentials_path'])
+            else:
+                print(blue('\nEnter the directory path containing the tokens and '
+                           'credentials files (JSON)'))
+                while True:
+                    tokens_dirpath = os.path.expanduser(input('Directory path: ').strip())
+                    if os.path.isdir(tokens_dirpath):
+                        break
+                    else:
+                        print(red(f'{bold(tokens_dirpath)} is not a directory!'))
+                print()
+        tokens_filepath = os.path.join(tokens_dirpath, TOKENS_FILENAME)
+        if os.path.exists(tokens_filepath):
+            logger.debug(f'Removing the token file {bold(tokens_filepath)}')
+            os.remove(tokens_filepath)
+            logger.info(green('googleapi tokens successfully updated!'))
+            result.set_success()
+            return result
+        else:
+            error_msg = f"The directory {bold(tokens_dirpath)} doesn't " \
+                        f"contain the tokens file {bold(TOKENS_FILENAME)}"
+            self._log_error(error_msg)
+            return result.set_error(error_msg)
 
 
 def main():
     try:
         exit_code = 0
         # Check project directory
-        mkdir(cryptlib.PROJECT_DIR)
-        mkdir(cryptlib.LOGS_DIR)
+        mkdir(cryptlib.__project_dir__)
+        mkdir(default_logging.LOGS_DIR)
         # Parse command-line arguments
         parser = setup_argparser()
         args = parser.parse_args()
-        main_cfg = argparse.Namespace(**get_config_dict('main', cryptlib.PROJECT_DIR))
+        main_cfg = argparse.Namespace(**get_config_dict('main', cryptlib.__project_dir__))
         # Override configuration dict with command-line arguments
         returned_values = override_config_with_args(main_cfg, get_config_dict('main'), args)
-        setup_log(package='cryptlib',
+        setup_log(package=cryptlib.__package_name__,
                   script_name=prog_name(__file__),
-                  log_filepath=cryptlib.LOGGING_PATH,
+                  log_filepath=LOGGING_PATH,
                   quiet=main_cfg.quiet,
                   verbose=main_cfg.verbose,
                   logging_level=main_cfg.logging_level,
@@ -987,6 +1047,9 @@ def main():
     except KeyboardInterrupt:
         logger.debug('Ctrl+c detected!')
         exit_code = 2
+    except EOFError:
+        logger.debug('Ctrl+d detected!')
+        exit_code = 3
     return exit_code
 
 

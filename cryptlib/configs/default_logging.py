@@ -1,4 +1,19 @@
-from cryptlib import LOGS_PATH
+import os
+import platform
+import sys
+
+from cryptlib import __project_name__, __project_dir__
+
+# Logs directory
+if platform.system() == 'Darwin':
+    LOGS_DIR = os.path.expanduser(f'~/Library/Logs/{__project_name__}')
+elif platform.system() == 'Linux':
+    LOGS_DIR = os.path.expanduser(f'{__project_dir__/{__project_name__}}')
+else:
+    print(f'OS not supported: {platform.system()}')
+    sys.exit(1)
+# Logs file
+LOGS_PATH = os.path.join(LOGS_DIR, 'logs.txt')
 
 logging = {
     'version': 1,
