@@ -346,13 +346,15 @@ def setup_log(package=None, script_name=None, log_filepath=None,
 # ------
 # Colors
 # ------
-def color(msg, msg_color='y', bold=False):
+def color(msg, msg_color='y', bold_msg=False):
     msg_color = msg_color.lower()
     colors = list(_COLOR_TO_CODE.keys())
     assert msg_color in colors, f'Wrong color: {msg_color}. Only these ' \
                                 f'colors are supported: {msg_color}'
-    if bold:
+    if bold_msg:
         msg = f"{COLORS['BOLD']}{msg}{COLORS['NC']}"
+    # e.g. bla bla \x1b[1mBOLD message\x1b[0m\x1b[0m bla bla
+    msg = msg.replace(COLORS['NC'], COLORS['NC']+_COLOR_TO_CODE[msg_color])
     return f"{_COLOR_TO_CODE[msg_color]}{msg}{COLORS['NC']}"
 
 

@@ -203,7 +203,7 @@ def setup_argparser():
         usage=subcommand_usage(cryptlib.__project_name__, subcommand),
         description=desc,
         add_help=False,
-        help='Uninstall the program.',
+        help=f'Uninstall the {bold(cryptlib.__project_name__)} program.',
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_test, remove_opts=['interactive', 'homedir'])
@@ -251,9 +251,9 @@ def setup_argparser():
         subcommand,
         prog=cryptlib.__project_name__,
         usage=subcommand_usage(cryptlib.__project_name__, subcommand),
-        description='Run tests as defined in the config file.',
+        description='Run tests as defined in the config file such as TODO.',
         add_help=False,
-        help='Run tests.',
+        help='Run tests (e.g. test the connection to an email server).',
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_test)
@@ -339,26 +339,29 @@ def setup_argparser():
     parser_update = subparsers.add_parser(
         subcommand,
         prog=cryptlib.__project_name__,
-        usage=subcommand_usage(cryptlib.__project_name__, subcommand,
-                               required_args='-u USERNAME'),
-        description='Update keyring (i.e. email password or GPG passphrase).',
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
+        description='Update a googleapi token or the keyring (i.e. email password or GPG passphrase).',
         add_help=False,
-        help='Update keyring.',
+        help='Update the keyring or a googleapi token.',
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_update,
                         remove_opts=['homedir', 'interactive', 'prompt_passwords'])
-    parser_update_group = parser_update.add_argument_group(
-        title=f"{yellow('Update options')}")
-    update_mutual_group = parser_update_group.add_mutually_exclusive_group()
+    parser_update_key_group = parser_update.add_argument_group(
+        title=f"{yellow('Update keyring options')}")
+    update_mutual_group = parser_update_key_group.add_mutually_exclusive_group()
     update_mutual_group.add_argument('-e', '--email-password', dest='email_password',
                                      action='store_true',
-                                     help='Update email password saved in keyring.')
+                                     help='Update an email password for a given username found in the keyring.')
     update_mutual_group.add_argument('-g', '--gpg-passphrase', dest='gpg_passphrase',
                                      action='store_true',
-                                     help='Update GPG password saved in keyring.')
-    parser_update_group.add_argument('-u', '--username', dest='username', required=True,
-                                     help='Username.')
+                                     help='Update a GPG passphrase for a given username found in the keyring.')
+    parser_update_key_group.add_argument('-u', '--username', dest='username',
+                                         help='Username.')
+    parser_update_token_group = parser_update.add_argument_group(
+        title=f"{yellow('Update googleapi token options')}")
+    parser_update_token_group.add_argument('-t', '--token', dest='token', metavar='PATH',
+                                           help='Update a googleapi token if it has been expired or revoked.')
     # ==============
     # Delete options
     # ==============
@@ -369,9 +372,9 @@ def setup_argparser():
         prog=cryptlib.__project_name__,
         usage=subcommand_usage(cryptlib.__project_name__, subcommand,
                                required_args='-u USERNAME'),
-        description='Delete account in keyring (i.e. email or GPG account).',
+        description='Delete an account in the keyring (i.e. email or GPG account).',
         add_help=False,
-        help='Delete account in keyring.',
+        help='Delete an account in the keyring.',
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_delete,
@@ -381,10 +384,10 @@ def setup_argparser():
     delete_mutual_group = parser_delete_group.add_mutually_exclusive_group()
     delete_mutual_group.add_argument('-e', '--email-account', dest='email_account',
                                      action='store_true',
-                                     help='Delete email account saved in keyring.')
+                                     help='Delete an email account for a given username in the keyring.')
     delete_mutual_group.add_argument('-g', '--gpg-account', dest='gpg_account',
                                      action='store_true',
-                                     help='Delete GPG account saved in keyring.')
-    parser_delete_group.add_argument('-u', '--username', dest='username', required=True,
+                                     help='Delete a GPG account for a given username in the keyring.')
+    parser_delete_group.add_argument('-u', '--username', dest='username',
                                      help='Username.')
     return parser

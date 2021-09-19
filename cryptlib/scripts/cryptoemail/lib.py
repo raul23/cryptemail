@@ -211,12 +211,12 @@ def update_gpg_pass(credential, success):
         return 1
     if success:
         logger.info(violet('Adding GPG passphrase in the keyring for '
-                           f'the fingerprint={bold(credential[1])}'))
+                           f'the fingerprint {bold(credential[1])}'))
         keyring.set_password(*credential)
         return 0
     else:
         warning_msg = "The GPG passphrase could not be added in the " \
                       "keyring for the " \
-                      f"fingerprint={bold(credential[1])}\n"
+                      f"fingerprint {bold(credential[1])}\n"
         logger.warning(yellow(warning_msg))
         return 0
