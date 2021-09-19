@@ -212,9 +212,9 @@ def setup_argparser():
     parser_uninstall_group.add_argument(
         '--uninstall', choices=['package', 'everything'],
         help=desc)
-    # ============================
-    # Edit cryptoemail config file
-    # ============================
+    # ===========================
+    # Edit cryptemail config file
+    # ===========================
     # create the parser for the "edit" command
     subcommand = 'edit'
     parser_test = subparsers.add_parser(
