@@ -147,7 +147,7 @@ def get_gpg_passphrase(prompt=False, gpg=None, fingerprint=None, message=None):
             if not prompt:
                 logger.warning(yellow('prompt_passwords = False'))
             raise ValueError('No GPG passphrase could be retrieved from the '
-                             f'keyring for fingerprint={fingerprint}')
+                             f'keyring for fingerprint {bold(fingerprint)}')
     return passphrase, credential
 
 
@@ -213,12 +213,12 @@ def update_gpg_pass(credential, success):
         return 1
     if success:
         logger.info(violet('Adding GPG passphrase in the keyring for '
-                           f'the fingerprint {bold(credential[1])}\n'))
+                           f'the fingerprint {bold(credential[1])}'))
         keyring.set_password(*credential)
         return 0
     else:
         warning_msg = "The GPG passphrase could not be added in the " \
                       "keyring for the " \
-                      f"fingerprint {bold(credential[1])}\n"
+                      f"fingerprint {bold(credential[1])}"
         logger.warning(yellow(warning_msg))
         return 0

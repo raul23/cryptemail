@@ -340,7 +340,7 @@ class CryptoEmail:
                     gpg=gpg,
                     fingerprint=config['sign']['signature'],
                     message=blue("Enter your GPG passphrase for signing with "
-                                 f"fingerprint='{config['sign']['signature']}'"))
+                                 f"fingerprint {bold(config['sign']['signature'])}"))
             enc = gpg.encrypt(msg, recipient, sign=sign, passphrase=passphrase)
             return enc, cred
 
@@ -384,9 +384,9 @@ class CryptoEmail:
 
     @staticmethod
     def _fingerprint_exists(fingerprint, gpg):
-        logger.debug(f"Checking fingerprint='{fingerprint}' ...")
+        logger.debug(f"Checking fingerprint {bold(fingerprint)} ...")
         if fingerprint not in gpg.list_keys().fingerprints:
-            logger.debug(f"The fingerprint='{fingerprint}' was not found in "
+            logger.debug(f"The fingerprint {bold(fingerprint)} was not found in "
                          "the keyring")
             return 0
         return 1
@@ -772,7 +772,7 @@ class CryptoEmail:
             gpg=gpg,
             fingerprint=config['sign']['signature'],
             message=blue("Enter your GPG passphrase for signing with "
-                         f"fingerprint='{config['sign']['signature']}'"))
+                         f"fingerprint {bold(config['sign']['signature'])}"))
         message = gpg.sign(message_text,
                            keyid=config['sign']['signature'],
                            passphrase=passphrase)
@@ -882,8 +882,8 @@ class CryptoEmail:
             gpg=gpg,
             fingerprint=self.config.send_emails['encrypt']['recipient_userid'],
             message=blue("Enter your GPG passphrase for decrypting with "
-                         "fingerprint="
-                         f"'{self.config.send_emails['encrypt']['recipient_userid']}'"))
+                         "fingerprint "
+                         f"{bold(self.config.send_emails['encrypt']['recipient_userid'])}"))
         decrypted_message = gpg.decrypt(str(encrypted_message), passphrase=passphrase)
         del passphrase
         logger.info('')
