@@ -226,22 +226,21 @@ def setup_argparser():
         help='Edit/reset the configuration file.',
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
-    add_general_options(parser_test, remove_opts=['interactive', 'homedir'])
+    add_general_options(parser_test, remove_opts=['homedir', 'interactive',
+                                                  'prompt_passwords'])
     parser_edit_group = parser_test.add_argument_group(
         title=f"{yellow('Edit/reset options')}")
     edit_mutual_group = parser_edit_group.add_mutually_exclusive_group()
     edit_mutual_group.add_argument(
-        '-e', '--edit', action='store_true',
-        help=f'Edit the {prog_name(__file__)} configuration file.')
-    edit_mutual_group.add_argument(
         '-a', '--app', dest='app',
         help='Name of the application to use for editing the '
-             f'{prog_name(__file__)} configuration file. If no name is given, '
-             'then the default application for opening this type of file (.py) '
-             'will be used.')
+             f'{bold(cryptlib.__project_name__)} configuration file. If no name is '
+             'given, then the default application for opening this type of '
+             'file (.py) will be used.')
     edit_mutual_group.add_argument(
-        '--reset', action='store_true',
-        help=f'Reset the {prog_name(__file__)} configuration file to factory values.')
+        '-r', '--reset', action='store_true',
+        help=f'Reset the {bold(cryptlib.__project_name__)} configuration file '
+             'to factory values.')
     # ===============
     # Testing options
     # ===============

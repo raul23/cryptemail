@@ -10,7 +10,7 @@ import shutil
 
 from cryptlib.utils.genutils import (bold, get_config_filepath,
                                      get_logging_filepath,
-                                     get_main_config_filepath, run_cmd)
+                                     get_main_config_filepath, green, run_cmd)
 from cryptlib.utils.logutils import Logger, log_error
 
 logger = Logger(__name__, __file__)
@@ -98,16 +98,16 @@ def edit_file(cfg_type='main', app=None, configs_dirpath=None, verbose=False):
     return retcode
 
 
-def reset_file(cfg_type, configs_dirpath=None):
+def reset_file(cfg_type='main', configs_dirpath=None):
     # Get path to the config file
     filepath = get_config_filepath(cfg_type, configs_dirpath)
-    logger.info(f'Resetting the file {os.path.basename(filepath)} ...')
-    logger.debug(f"Filepath: {filepath}")
+    logger.info(f'Resetting {bold(os.path.basename(filepath))} ...')
+    logger.debug(f'Filepath: {filepath}')
     # Copy it from the default one
     if cfg_type == 'main':
         src = get_main_config_filepath(configs_dirpath, default_config=True)
     else:
         src = get_logging_filepath(configs_dirpath, default_config=True)
     shutil.copy(src, filepath)
-    logger.info("File was reset!")
+    logger.info(green('File was reset!'))
     return 0

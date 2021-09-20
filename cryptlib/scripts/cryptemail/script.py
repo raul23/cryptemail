@@ -3,7 +3,6 @@ import readline
 import smtplib
 import ssl
 import time
-import traceback
 from functools import wraps
 from urllib import parse
 
@@ -1033,9 +1032,12 @@ def main():
         if main_cfg.subcommand == 'uninstall':
             logger.info('Uninstalling program ...')
         elif main_cfg.subcommand == 'edit':
-            exit_code = edit_file(app=main_cfg.app,
-                                  configs_dirpath=cryptlib.__project_dir__,
-                                  verbose=main_cfg.verbose)
+            if main_cfg.reset:
+                exit_code = reset_file(configs_dirpath=cryptlib.__project_dir__)
+            else:
+                exit_code = edit_file(app=main_cfg.app,
+                                      configs_dirpath=cryptlib.__project_dir__,
+                                      verbose=main_cfg.verbose)
         else:
             exit_code = CryptEmail(main_cfg).run()
     except KeyboardInterrupt:
