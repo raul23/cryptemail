@@ -19,7 +19,6 @@ from cryptlib.configs import default_config, default_logging
 from cryptlib.utils.genutils import *
 from lib import *
 
-# logger = init_log(__name__, __file__)
 # Change logging level for googleapiclient and gnupg loggers
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 logging.getLogger('gnupg').setLevel(logging.ERROR)
