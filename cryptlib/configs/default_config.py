@@ -6,7 +6,7 @@
 # Common options
 # ==============
 # Home directory where the keys are saved (e.g. ~/.gnupg)
-homedir = '/path/to/homedir'
+homedir = 'WRITEME: /path/to/homedir'
 interactive = False
 prompt_passwords = True
 
@@ -26,7 +26,7 @@ app = None
 # ==================
 # Connection options
 # ==================
-mailbox_address = 'your_mailbox@address.com'
+mailbox_address = 'WRITEME: your_mailbox@address.com'
 # How to connect to the email server: googleapi or smtp_imap
 connection_method = 'smtp_imap'
 
@@ -34,7 +34,7 @@ connection_method = 'smtp_imap'
 # IMPORTANT: token-based authentication is only supported for gmail addresses
 # The use of tokens is more secure than using an email password
 googleapi = {
-    'credentials_path': '/path/to/credentials.json',
+    'credentials_path': 'WRITEME: /path/to/credentials.json',
     # Scopes for the gmail google API
     'scopes_for_sending': ['https://www.googleapis.com/auth/gmail.modify'],
     'scopes_for_reading': ['https://www.googleapis.com/auth/gmail.modify'],
@@ -45,10 +45,10 @@ googleapi = {
 smtp_imap = {
     'smtp_port': 587,  # tls
     'imap_port': 993,  # tls
-    # Outgoing Mail (SMTP) Server
-    'smtp_server': 'SMTP_SERVER_NAME',  # e.g. smtp.gmail.com
-    # Incoming Mail (IMAP) Server
-    'imap_server': 'IMAP_SERVER_NAME'  # e.g. imap.gmail.com
+    # Outgoing Mail (SMTP) Server, e.g. smtp.gmail.com
+    'smtp_server': 'WRITEME: SMTP_SERVER_NAME',
+    # Incoming Mail (IMAP) Server, e.g. imap.gmail.com
+    'imap_server': 'WRITEME: IMAP_SERVER_NAME'
 }
 
 # ==================================
@@ -56,7 +56,7 @@ smtp_imap = {
 # ==================================
 # Config options for sending emails
 send_emails = {
-    'receiver_email_address': 'receiver@mail.com',
+    'receiver_email_address': 'WRITEME: receiver@mail.com',
     # Sign and encrypt in a single pass. Otherwise, sign first and then encrypt
     # as separate steps
     'use_single_pass': True,
@@ -65,13 +65,13 @@ send_emails = {
         'program': 'GPG',
         'enable_signature': False,
         # Your signature (USER-ID), e.g. fingerprint
-        'signature': 'YOUR_SIGNATURE'
+        'signature': 'WRITEME: YOUR_SIGNATURE'
     },
     # Encryption options
     'encrypt': {
         'program': 'GPG',
         # Recipient's USER-ID, e.g. fingerprint
-        'recipient_userid': 'RECIPIENT_USERID'
+        'recipient_userid': 'WRITEME: RECIPIENT_USERID'
     }
 }
 
@@ -79,7 +79,7 @@ send_emails = {
 read_emails = {
     'add_decryption_results': False,
     # Directory for saving emails
-    'emails_dirpath': '/path/to/emails'
+    'emails_dirpath': 'WRITEME: /path/to/emails'
 }
 
 # ===============

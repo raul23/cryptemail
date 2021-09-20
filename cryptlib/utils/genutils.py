@@ -6,7 +6,9 @@ import importlib
 import json
 import logging.config
 import os
+import shlex
 import shutil
+import subprocess
 import sys
 from collections import namedtuple, OrderedDict
 from logging import NullHandler
@@ -294,6 +296,48 @@ def override_config_with_args(main_config, default_main_config, args):
 def prog_name(filename):
     filename = Path(filename).name
     return filename.split('.py')[0]
+
+
+def run_cmd(cmd):
+    """Run a shell command with arguments.
+
+    The shell command is given as a string but the function will split it in
+    order to get a list having the name of the command and its arguments as
+    items.
+
+    Parameters
+    ----------
+    cmd : str
+        Command to be executed, e.g. ::
+
+            open -a TextEdit text.txt
+
+    Returns
+    -------
+    retcode: int
+        Returns code which is 0 if the command was successfully completed.
+        Otherwise, the return code is non-zero.
+
+    Raises
+    ------
+    FileNotFoundError
+        Raised if the command ``cmd`` is not recognized, e.g.
+        ``$ TextEdit {filepath}`` since `TextEdit` is not an executable.
+
+    """
+    try:
+        if sys.version_info.major == 3 and sys.version_info.minor <= 6:
+            # TODO: PIPE not working as arguments and capture_output new in
+            # Python 3.7
+            # Ref.: https://stackoverflow.com/a/53209196
+            #       https://bit.ly/3lvdGlG
+            result = subprocess.run(shlex.split(cmd))
+        else:
+            result = subprocess.run(shlex.split(cmd), capture_output=True)
+    except FileNotFoundError:
+        raise
+    else:
+        return result
 
 
 def setup_log(package=None, script_name=None, log_filepath=None,

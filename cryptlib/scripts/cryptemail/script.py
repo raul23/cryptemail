@@ -16,6 +16,7 @@ from google.oauth2.credentials import Credentials
 
 from args import CONNECTIONS, setup_argparser
 from cryptlib.configs import default_config, default_logging
+from cryptlib.edit import edit_file, reset_file
 from cryptlib.utils.genutils import *
 from lib import *
 
@@ -1040,6 +1041,8 @@ def main():
         process_returned_values(returned_values)
         if main_cfg.subcommand == 'uninstall':
             logger.info('Uninstalling program ...')
+        elif main_cfg.subcommand == 'edit':
+            edit_file(app=main_cfg.app, configs_dirpath=cryptlib.__project_dir__)
         else:
             exit_code = CryptEmail(main_cfg).run()
     except KeyboardInterrupt:

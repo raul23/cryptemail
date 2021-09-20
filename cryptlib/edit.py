@@ -8,10 +8,10 @@ import platform
 import os
 import shutil
 
-from monitoring.utils.genutils import (get_config_filepath,
-                                       get_logging_filepath,
-                                       get_main_config_filepath, run_cmd)
-from monitoring.utils.logutils import init_log
+from cryptlib.utils.genutils import (get_config_filepath,
+                                     get_logging_filepath,
+                                     get_main_config_filepath, run_cmd)
+from cryptlib.utils.logutils import init_log
 
 logger = init_log(__name__, __file__)
 
