@@ -8,16 +8,16 @@ import platform
 import os
 import shutil
 
-from cryptlib.utils.genutils import (get_config_filepath,
+from cryptlib.utils.genutils import (bold, get_config_filepath,
                                      get_logging_filepath,
                                      get_main_config_filepath, run_cmd)
-from cryptlib.utils.logutils import init_log
+from cryptlib.utils.logutils import Logger, log_error
 
-logger = init_log(__name__, __file__)
+logger = Logger(__name__, __file__)
 
 
 # NOTE: https://stackoverflow.com/a/27163648 [launch PyCharm from terminal]
-def edit_file(cfg_type='main', app=None, configs_dirpath=None):
+def edit_file(cfg_type='main', app=None, configs_dirpath=None, verbose=False):
     """Edit a configuration file.
 
     The user chooses what type of config file (`cfg_type`) to edit: 'log' for
@@ -89,21 +89,19 @@ def edit_file(cfg_type='main', app=None, configs_dirpath=None):
         result = run_cmd(cmd)  # stderr=subprocess.DEVNULL)
         retcode = result.returncode
     if retcode == 0:
-        logger.info("Opening the file {}...".format(
-            os.path.basename(filepath)))
-        logger.debug(f"Filepath: {filepath}")
+        logger.info(f'Opening {bold(os.path.basename(filepath))} ...')
+        logger.debug(f'Filepath: {filepath}')
     else:
         if result:
             err = result.stderr.decode().strip()
-            logger.error(err)
+            log_error(logger, err, verbose)
     return retcode
 
 
 def reset_file(cfg_type, configs_dirpath=None):
     # Get path to the config file
     filepath = get_config_filepath(cfg_type, configs_dirpath)
-    logger.info("Resetting the file {}...".format(
-        os.path.basename(filepath)))
+    logger.info(f'Resetting the file {os.path.basename(filepath)} ...')
     logger.debug(f"Filepath: {filepath}")
     # Copy it from the default one
     if cfg_type == 'main':

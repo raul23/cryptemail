@@ -18,6 +18,7 @@ from args import CONNECTIONS, setup_argparser
 from cryptlib.configs import default_config, default_logging
 from cryptlib.edit import edit_file, reset_file
 from cryptlib.utils.genutils import *
+from cryptlib.utils.logutils import log_error
 from lib import *
 
 # Change logging level for googleapiclient and gnupg loggers
@@ -172,7 +173,7 @@ class CryptEmail:
     def _create_attrs(self, attrs):
         for attr in attrs:
             # If attr doesn't exist, create it and set it to None
-            if getattr(self.config, attr, None) is None:
+            if getattr(self.config, attr, 'not_found') == 'not_found':
                 logger.debug(f'{attr} = None')
                 setattr(self.config, attr, None)
 
@@ -566,17 +567,7 @@ class CryptEmail:
 
     # TODO: change param name from nl to newline?
     def _log_error(self, error, nl=False):
-        if self.config.verbose:
-            error_msg = traceback.format_exc().strip()
-            if error_msg == 'NoneType: None':
-                error_msg = error
-            elif error.__str__() not in error_msg:
-                error_msg += f'\n{error}'
-        else:
-            error_msg = red(error.__str__())
-        if nl:
-            error_msg += '\n'
-        logger.error(red(error_msg))
+        log_error(logger, error, self.config.verbose, nl)
 
     def _login_stmp(self, server, password):
         result = Result()
@@ -1042,7 +1033,9 @@ def main():
         if main_cfg.subcommand == 'uninstall':
             logger.info('Uninstalling program ...')
         elif main_cfg.subcommand == 'edit':
-            edit_file(app=main_cfg.app, configs_dirpath=cryptlib.__project_dir__)
+            exit_code = edit_file(app=main_cfg.app,
+                                  configs_dirpath=cryptlib.__project_dir__,
+                                  verbose=main_cfg.verbose)
         else:
             exit_code = CryptEmail(main_cfg).run()
     except KeyboardInterrupt:

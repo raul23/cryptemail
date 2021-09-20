@@ -1,10 +1,12 @@
 import copy
 import logging
 import os
+import traceback
 from logging import NullHandler, StreamHandler
 
+# TODO: check why ImportError: cannot import name 'COLORS' from 'cryptlib.utils.genutils'
 from cryptlib.utils import genutils
-
+from genutils import COLORS, red
 
 class Logger:
     def __init__(self, name, file_):
@@ -56,7 +58,7 @@ class Logger:
 
     @staticmethod
     def _remove_colors(msg):
-        for c in genutils.COLORS.values():
+        for c in COLORS.values():
             msg = msg.replace(c, "")
         return msg
 
@@ -138,6 +140,21 @@ def init_log(module__name__, module___file__=None, package_name=None):
         logger_ = logging.getLogger(module__name__)
     logger_.addHandler(NullHandler())
     return logger_
+
+
+# TODO: change param name from nl to newline?
+def log_error(logger, error, verbose, nl=False):
+    if verbose:
+        error_msg = traceback.format_exc().strip()
+        if error_msg == 'NoneType: None':
+            error_msg = error
+        elif error.__str__() not in error_msg:
+            error_msg += f'\n{error}'
+    else:
+        error_msg = red(error.__str__())
+    if nl:
+        error_msg += '\n'
+    logger.error(red(error_msg))
 
 
 # TODO: specify log_dict change inline
