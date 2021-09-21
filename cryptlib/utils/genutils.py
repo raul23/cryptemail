@@ -2,6 +2,7 @@
 """
 import argparse
 import codecs
+import hashlib
 import importlib
 import json
 import logging.config
@@ -111,6 +112,17 @@ def get_config_filepath(cfg_type='main', configs_dirpath=None, default_config=Fa
     else:
         raise ValueError(f"Invalid cfg_type: {cfg_type}")
     return cfg_filepath
+
+
+# Ref.: https://stackoverflow.com/a/59056837/14664104
+def get_hash(file_path):
+    with open(file_path, "rb") as f:
+        file_hash = hashlib.md5()
+        chunk = f.read(8192)
+        while chunk:
+            file_hash.update(chunk)
+            chunk = f.read(8192)
+    return file_hash.hexdigest()
 
 
 def get_settings(conf, cfg_type):

@@ -4,8 +4,8 @@ the logging configuration file (`log`).
 The configuration file can be opened by a user-specified application (``app``)
 or a default program associated with this type of file (when ``app`` is `None`).
 """
-import platform
 import os
+import platform
 import shutil
 
 from cryptlib.utils.genutils import (bold, get_config_filepath,

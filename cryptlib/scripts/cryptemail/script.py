@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import platform
 import readline
 import smtplib
 import ssl
@@ -424,6 +425,43 @@ class CryptEmail:
         result = Result()
         default_cfg_fp = get_main_config_filepath(default_config=True)
         user_cfg_fp = get_main_config_filepath(configs_dirpath=cryptlib.__project_dir__)
+        # TODO: copy and remove following code
+        """
+        default_file_hash = get_hash(default_cfg_fp)
+        user_file_hash = get_hash(user_cfg_fp)
+        if default_file_hash != user_file_hash:
+            print()
+            logger.warning(yellow('Resetting the config file ...'))
+            if platform.system() == 'Darwin':
+                cmd = '<cmd + c>'
+            else:
+                cmd = '<Ctrl + c>'
+            print(f"Press {bold(cmd)} to cancel")
+            try:
+                i = 3
+                while True:
+                    if i == 0:
+                        break
+                    print('', end=f'\r{i}')
+                    time.sleep(1)
+                    i -= 1
+            except KeyboardInterrupt:
+                warn_msg = 'Config file not reset. Initialization canceled'
+                print('\n')
+                logger.warning(yellow(warn_msg))
+                return result.set_warning(warn_msg, exit_code=4)
+            shutil.copy(default_cfg_fp, user_cfg_fp)
+            print()
+            logger.info(green('Config file reset!'))
+        """
+        print(blue('\nConfig file will be updated. Do you want to continue (y/n)?'))
+        ans = self._input('choice', values=['y', 'n'], lower=True)
+        if ans == 'n':
+            print()
+            warn_msg = 'Initialization canceled!'
+            logger.warning(yellow(warn_msg))
+            return result.set_warning(warn_msg, exit_code=4)
+
         default_content = read(default_cfg_fp)
         user_content = read(user_cfg_fp)
         regex_template = r"(FIELD_NAME[\s]*[=|:]{1})[\s]*(FIELD_VALUE)"
