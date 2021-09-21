@@ -424,7 +424,6 @@ class CryptEmail:
         result = Result()
         default_cfg_fp = get_main_config_filepath(default_config=True)
         user_cfg_fp = get_main_config_filepath(configs_dirpath=cryptlib.__project_dir__)
-        import ipdb
         default_content = read(default_cfg_fp)
         user_content = read(user_cfg_fp)
         regex_template = r"(FIELD_NAME[\s]*[=|:]{1})[\s]*(FIELD_VALUE)"
@@ -489,7 +488,6 @@ class CryptEmail:
                     else:
                         print(violet('Skipped field!'))
                     print()
-        ipdb.set_trace()
         write(user_cfg_fp, user_content)
         return result.set_success()
 
