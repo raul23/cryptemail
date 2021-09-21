@@ -200,7 +200,7 @@ def setup_argparser():
         usage=subcommand_usage(cryptlib.__project_name__, subcommand),
         description='Edit the configuration file.',
         add_help=False,
-        help=blue(f"Edit the {bold('configuration file')}."),
+        help=blue(f"{bold('Edit')} the configuration file."),
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_edit, remove_opts=['homedir', 'interactive',
@@ -224,7 +224,7 @@ def setup_argparser():
         usage=subcommand_usage(cryptlib.__project_name__, subcommand),
         description='Initialize the configuration file.',
         add_help=False,
-        help=blue(f"Initialize the {bold('configuration file')}."),
+        help=blue(f"{bold('Initialize')} the configuration file."),
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_init,
@@ -242,7 +242,7 @@ def setup_argparser():
         description=f'Reset the {bold(cryptlib.__project_name__)} configuration '
                     'file to factory values.',
         add_help=False,
-        help=blue(f"Reset the {bold('configuration file')}."),
+        help=blue(f"{bold('Reset')} the configuration file."),
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_reset, remove_opts=['homedir', 'interactive',
@@ -259,7 +259,7 @@ def setup_argparser():
         description='Read emails from your inbox which might contain '
                     'unencrypted and encrypted emails.',
         add_help=False,
-        help=violet('Read your emails.'),
+        help=violet(f"{bold('Read')} your emails."),
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_read)
@@ -278,7 +278,7 @@ def setup_argparser():
         usage=subcommand_usage(cryptlib.__project_name__, subcommand),
         description='Send a signed and/or encrypted email.',
         add_help=False,
-        help=violet('Send an encrypted email.'),
+        help=violet(f"{bold('Send')} an encrypted email."),
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_send)
@@ -308,7 +308,7 @@ def setup_argparser():
                                required_args='-u USERNAME'),
         description='Delete an account in the keyring (i.e. email or GPG account).',
         add_help=False,
-        help=green('Delete an account in the keyring.'),
+        help=green(f"{bold('Delete')} an account in the keyring."),
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_delete,
@@ -335,7 +335,7 @@ def setup_argparser():
         usage=subcommand_usage(cryptlib.__project_name__, subcommand),
         description='Update the googleapi tokens or the keyring (i.e. email password or GPG passphrase).',
         add_help=False,
-        help=green('Update the keyring or googleapi tokens.'),
+        help=green(f"{bold('Update')} the keyring or googleapi tokens."),
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_update,
@@ -369,7 +369,7 @@ def setup_argparser():
         usage=subcommand_usage(cryptlib.__project_name__, subcommand),
         description='Run tests as defined in the config file such as TODO.',
         add_help=False,
-        help='Run tests (e.g. test the connection to an email server).',
+        help=f"Run {bold('tests')} (e.g. test the connection to an email server).",
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_test)
@@ -412,7 +412,7 @@ def setup_argparser():
         usage=subcommand_usage(cryptlib.__project_name__, subcommand),
         description=desc,
         add_help=False,
-        help=f'Uninstall the {bold(cryptlib.__project_name__)} program.',
+        help=f"{bold('Uninstall')} the {bold(cryptlib.__project_name__)} program.",
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_test, remove_opts=['interactive', 'homedir'])
