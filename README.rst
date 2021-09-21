@@ -8,7 +8,7 @@ cryptemail
     <br> 🚧 &nbsp;&nbsp;&nbsp;<b>Work-In-Progress</b>
   </p>
   
-Python command-line program for sending and reading encrypted emails using GnuPG.
+Python command-line program for sending and reading emails encrypted using GnuPG.
 
 .. contents:: **Contents**
    :depth: 3
