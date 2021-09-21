@@ -189,29 +189,34 @@ def setup_argparser():
         # TODO: important, test without subcommand
         subparsers = parser.add_subparsers(
             title=title, description=None, dest='subcommand', help=None)
-    # =================
-    # Uninstall options
-    # =================
-    # create the parser for the "uninstall" command
-    subcommand = 'uninstall'
-    desc = "Uninstall the `package` (including the program " \
-           f"'{prog_name(__file__)}') or `everything` (including config and " \
-           "log files)."
-    parser_test = subparsers.add_parser(
+    # ==============
+    # Delete options
+    # ==============
+    # create the parser for the "delete" command
+    subcommand = 'delete'
+    parser_delete = subparsers.add_parser(
         subcommand,
         prog=cryptlib.__project_name__,
-        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
-        description=desc,
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand,
+                               required_args='-u USERNAME'),
+        description='Delete an account in the keyring (i.e. email or GPG account).',
         add_help=False,
-        help=f'Uninstall the {bold(cryptlib.__project_name__)} program.',
+        help='Delete an account in the keyring.',
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
-    add_general_options(parser_test, remove_opts=['interactive', 'homedir'])
-    parser_uninstall_group = parser_test.add_argument_group(
-        title=f"{yellow('Uninstall options')}")
-    parser_uninstall_group.add_argument(
-        '--uninstall', choices=['package', 'everything'],
-        help=desc)
+    add_general_options(parser_delete,
+                        remove_opts=['homedir', 'interactive', 'prompt_passwords', 'quiet'])
+    parser_delete_group = parser_delete.add_argument_group(
+        title=f"{yellow('Delete options')}")
+    delete_mutual_group = parser_delete_group.add_mutually_exclusive_group()
+    delete_mutual_group.add_argument('-e', '--email-account', dest='email_account',
+                                     action='store_true',
+                                     help='Delete an email account for a given username in the keyring.')
+    delete_mutual_group.add_argument('-g', '--gpg-account', dest='gpg_account',
+                                     action='store_true',
+                                     help='Delete a GPG account for a given username in the keyring.')
+    parser_delete_group.add_argument('-u', '--username', dest='username',
+                                     help='Username.')
     # ===========================
     # Edit cryptemail config file
     # ===========================
@@ -241,6 +246,72 @@ def setup_argparser():
         '-r', '--reset', action='store_true',
         help=f'Reset the {bold(cryptlib.__project_name__)} configuration file '
              'to factory values.')
+    # ============
+    # Init options
+    # ============
+    # create the parser for the "init" command
+    subcommand = 'init'
+    parser_init = subparsers.add_parser(
+        subcommand,
+        prog=cryptlib.__project_name__,
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
+        description='Initialize the config file.',
+        add_help=False,
+        help='Initialize the config file.',
+        formatter_class=lambda prog: MyFormatter(
+            prog, max_help_position=50, width=width))
+    add_general_options(parser_init,
+                        remove_opts=['homedir', 'interactive', 'prompt_passwords', 'quiet'])
+    parser_init_group = parser_init.add_argument_group(title=f"{yellow('Init options')}")
+    # ===================
+    # Read emails options
+    # ===================
+    # create the parser for the "read" command
+    subcommand = 'read'
+    parser_read = subparsers.add_parser(
+        subcommand,
+        prog=cryptlib.__project_name__,
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
+        description='Read emails from your inbox which might contain '
+                    'unencrypted and encrypted emails.',
+        add_help=False,
+        help='Read your emails.',
+        formatter_class=lambda prog: MyFormatter(
+            prog, max_help_position=50, width=width))
+    add_general_options(parser_read)
+    add_connection_options(parser_read)
+    add_googleapi_options(parser_read)
+    add_smtp_imap_options(parser_read)
+    parser_read_group = parser_read.add_argument_group(title=f"{yellow('Read options')}")
+    # ===================
+    # Send emails options
+    # ===================
+    # create the parser for the "send" command
+    subcommand = 'send'
+    parser_send = subparsers.add_parser(
+        subcommand,
+        prog=cryptlib.__project_name__,
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
+        description='Send a signed and/or encrypted email.',
+        add_help=False,
+        help='Send an encrypted email.',
+        formatter_class=lambda prog: MyFormatter(
+            prog, max_help_position=50, width=width))
+    add_general_options(parser_send)
+    add_connection_options(parser_send)
+    add_googleapi_options(parser_send)
+    add_smtp_imap_options(parser_send)
+    add_encryption_options(parser_send)
+    parser_send_group = parser_send.add_argument_group(title=f"{yellow('Send options')}")
+    parser_send_group.add_argument('-m', '--email-message', metavar='STRING', nargs=2,
+                                   help='The email subject and text.')
+    parser_send_group.add_argument(
+        '-p', '--email-path', metavar='PATH',
+        help='Path to a text file containing the email to be sent.')
+    parser_send_group.add_argument(
+        '-r', '--receiver-email', metavar='ADDRESS',
+        dest='send_emails.receiver_email_address',
+        help="Receiver's email address (e.g. receiver@address.com)")
     # ===============
     # Testing options
     # ===============
@@ -281,55 +352,29 @@ def setup_argparser():
         help="Test connecting to an email server either with tokens "
              f"(`{CONNECTIONS['tokens']}`) or an email password "
              f"(`{CONNECTIONS['password']}`).")
-    # ===================
-    # Send emails options
-    # ===================
-    # create the parser for the "send" command
-    subcommand = 'send'
-    parser_send = subparsers.add_parser(
+    # =================
+    # Uninstall options
+    # =================
+    # create the parser for the "uninstall" command
+    subcommand = 'uninstall'
+    desc = "Uninstall the `package` (including the program " \
+           f"'{prog_name(__file__)}') or `everything` (including config and " \
+           "log files)."
+    parser_test = subparsers.add_parser(
         subcommand,
         prog=cryptlib.__project_name__,
         usage=subcommand_usage(cryptlib.__project_name__, subcommand),
-        description='Send a signed and/or encrypted email.',
+        description=desc,
         add_help=False,
-        help='Send an encrypted email.',
+        help=f'Uninstall the {bold(cryptlib.__project_name__)} program.',
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
-    add_general_options(parser_send)
-    add_connection_options(parser_send)
-    add_googleapi_options(parser_send)
-    add_smtp_imap_options(parser_send)
-    add_encryption_options(parser_send)
-    parser_send_group = parser_send.add_argument_group(title=f"{yellow('Send options')}")
-    parser_send_group.add_argument('-m', '--email-message', metavar='STRING', nargs=2,
-                                   help='The email subject and text.')
-    parser_send_group.add_argument(
-        '-p', '--email-path', metavar='PATH',
-        help='Path to a text file containing the email to be sent.')
-    parser_send_group.add_argument(
-        '-r', '--receiver-email', metavar='ADDRESS',
-        dest='send_emails.receiver_email_address',
-        help="Receiver's email address (e.g. receiver@address.com)")
-    # ===================
-    # Read emails options
-    # ===================
-    # create the parser for the "read" command
-    subcommand = 'read'
-    parser_read = subparsers.add_parser(
-        subcommand,
-        prog=cryptlib.__project_name__,
-        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
-        description='Read emails from your inbox which might contain '
-                    'unencrypted and encrypted emails.',
-        add_help=False,
-        help='Read your emails.',
-        formatter_class=lambda prog: MyFormatter(
-            prog, max_help_position=50, width=width))
-    add_general_options(parser_read)
-    add_connection_options(parser_read)
-    add_googleapi_options(parser_read)
-    add_smtp_imap_options(parser_read)
-    parser_read_group = parser_send.add_argument_group(title=f"{yellow('Read options')}")
+    add_general_options(parser_test, remove_opts=['interactive', 'homedir'])
+    parser_uninstall_group = parser_test.add_argument_group(
+        title=f"{yellow('Uninstall options')}")
+    parser_uninstall_group.add_argument(
+        '--uninstall', choices=['package', 'everything'],
+        help=desc)
     # ==============
     # Update options
     # ==============
@@ -364,32 +409,5 @@ def setup_argparser():
     parser_update_token_group.add_argument(
         '-d', '--directory', metavar='PATH', dest='tokens_dirpath',
         help="Directory path containing the tokens and credentials files (JSON).")
-    # ==============
-    # Delete options
-    # ==============
-    # create the parser for the "delete" command
-    subcommand = 'delete'
-    parser_delete = subparsers.add_parser(
-        subcommand,
-        prog=cryptlib.__project_name__,
-        usage=subcommand_usage(cryptlib.__project_name__, subcommand,
-                               required_args='-u USERNAME'),
-        description='Delete an account in the keyring (i.e. email or GPG account).',
-        add_help=False,
-        help='Delete an account in the keyring.',
-        formatter_class=lambda prog: MyFormatter(
-            prog, max_help_position=50, width=width))
-    add_general_options(parser_delete,
-                        remove_opts=['homedir', 'interactive', 'prompt_passwords', 'quiet'])
-    parser_delete_group = parser_delete.add_argument_group(
-        title=f"{yellow('Delete options')}")
-    delete_mutual_group = parser_delete_group.add_mutually_exclusive_group()
-    delete_mutual_group.add_argument('-e', '--email-account', dest='email_account',
-                                     action='store_true',
-                                     help='Delete an email account for a given username in the keyring.')
-    delete_mutual_group.add_argument('-g', '--gpg-account', dest='gpg_account',
-                                     action='store_true',
-                                     help='Delete a GPG account for a given username in the keyring.')
-    parser_delete_group.add_argument('-u', '--username', dest='username',
-                                     help='Username.')
     return parser
+

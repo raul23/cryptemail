@@ -1007,6 +1007,10 @@ class CryptEmail:
             return result.set_error(error_msg)
 
 
+def initialize():
+    logger.info('Initialize the config file ...')
+
+
 def main():
     try:
         exit_code = 0
@@ -1020,7 +1024,7 @@ def main():
         # Override configuration dict with command-line arguments
         returned_values = override_config_with_args(main_cfg, get_config_dict('main'), args)
         setup_log(package=cryptlib.__package_name__,
-                  script_name=prog_name(__file__),
+                  script_name=cryptlib.__project_name__,
                   log_filepath=LOGGING_PATH,
                   quiet=main_cfg.quiet,
                   verbose=main_cfg.verbose,
@@ -1029,15 +1033,18 @@ def main():
                   level_handler_names=['console', 'file'],
                   formater_handler_names=['console'])
         process_returned_values(returned_values)
-        if main_cfg.subcommand == 'uninstall':
-            logger.info('Uninstalling program ...')
-        elif main_cfg.subcommand == 'edit':
+        if main_cfg.subcommand == 'edit':
             if main_cfg.reset:
                 exit_code = reset_file(configs_dirpath=cryptlib.__project_dir__)
             else:
                 exit_code = edit_file(app=main_cfg.app,
                                       configs_dirpath=cryptlib.__project_dir__,
                                       verbose=main_cfg.verbose)
+        elif main_cfg.subcommand == 'init':
+            initialize()
+        elif main_cfg.subcommand == 'uninstall':
+            logger.info('Uninstalling the program '
+                        f'{bold(cryptlib.__project_name__)} ...')
         else:
             exit_code = CryptEmail(main_cfg).run()
     except KeyboardInterrupt:
