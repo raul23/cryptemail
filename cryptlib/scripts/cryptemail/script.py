@@ -442,7 +442,6 @@ class CryptEmail:
                 continue
             pos = match.start() - 2
             comment_line = ''
-            new_values = []
             while True:
                 if pos == -1:
                     error_msg = 'pos=-1: No comment found associated with ' \
@@ -488,7 +487,7 @@ class CryptEmail:
                         new_field = f"{field_name}{sep} {field_value}"
                         user_content = re.sub(regex, new_field, user_content)
                     else:
-                        logger.info(violet('Skipped field!'))
+                        print(violet('Skipped field!'))
                     print()
         ipdb.set_trace()
         write(user_cfg_fp, user_content)
