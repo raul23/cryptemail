@@ -297,6 +297,16 @@ def prog_name(filename):
     return filename.split('.py')[0]
 
 
+def read(filepath):
+    try:
+        with open(filepath, 'r') as f:
+            data = f.read()
+    except OSError:
+        raise
+    else:
+        return data
+
+
 def run_cmd(cmd):
     """Run a shell command with arguments.
 
@@ -384,6 +394,16 @@ def setup_log(package=None, script_name=None, log_filepath=None,
         "enabled" if verbose else "disabled"))
     logger.debug("Working directory: {}".format(package_path))
     logger.debug(main_log_msg)
+
+
+def write(filepath, data):
+    try:
+        with open(filepath, 'w') as f:
+            f.write(data)
+    except OSError:
+        raise
+    else:
+        return 0
 
 
 # ------

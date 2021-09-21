@@ -65,6 +65,8 @@ class CryptEmail:
                 return self._update_token().exit_code
             if self.config.subcommand in ['delete', 'update']:
                 return self._delete_or_update_keyring().exit_code
+            if self.config.subcommand == 'init':
+                return self._initialize().exit_code
         except EOFError:
             raise
         except Exception as e:
@@ -151,9 +153,9 @@ class CryptEmail:
                 f"{self.config.send_emails['sign']['signature']}")
         if getattr(self.config, 'args_test_connection', None) is not None or \
                 getattr(self.config, 'test_connection', None) is not None:
-            if self.config.run_tests:
+            if getattr(self.config, 'run_tests', None) is True:
                 self.config.connection_method = self.config.test_connection
-            else:
+            elif getattr(self.config, 'args_test_connection', None) is not None:
                 self.config.connection_method = self.config.args_test_connection
             logger.debug(f'connection_method = {self.config.connection_method}')
         attrs = ['args_test_encryption', 'args_test_connection',
@@ -417,16 +419,103 @@ class CryptEmail:
                 logger.debug(f"Removing 'Subject:' from '{self.subject}'")
                 self.subject = self.subject[len('Subject:'):].strip()
 
+    def _initialize(self):
+        logger.info('Initialize the config file ...')
+        result = Result()
+        default_cfg_fp = get_main_config_filepath(default_config=True)
+        user_cfg_fp = get_main_config_filepath(configs_dirpath=cryptlib.__project_dir__)
+        import ipdb
+        default_content = read(default_cfg_fp)
+        user_content = read(user_cfg_fp)
+        regex_template = r"(FIELD_NAME[\s]*[=|:]{1})[\s]*(FIELD_VALUE)"
+        regex = '([# ]*)' + regex_template
+        regex = regex.replace('FIELD_NAME', "[A-Za-z0-9_']+").replace('FIELD_VALUE', "'WRITEME:[\s]*[A-Za-z0-9_@.\/']+")
+        matches = re.finditer(regex, default_content, re.MULTILINE)
+        # ipdb.set_trace()
+        print(blue("\nEnter the following data. To skip a field, just press "
+                   f"{bold('<Enter>')}\n"))
+        for matchNum, match in enumerate(matches, start=1):
+            if match.group().startswith('#'):
+                # Skip comment line
+                continue
+            elif match.group().find('emails_dirpath') != -1:
+                continue
+            pos = match.start() - 2
+            comment_line = ''
+            new_values = []
+            while True:
+                if pos == -1:
+                    error_msg = 'pos=-1: No comment found associated with ' \
+                                f'he field data {bold(match.group().strip())}'
+                    self._log_error(error_msg)
+                    return result.set_error(error_msg)
+                char = default_content[pos]
+                if char == '\n':
+                    comment_line = default_content[pos:match.start()]
+                    if '# ' in comment_line:
+                        comment_line = comment_line.strip().split('# ')[1]
+                        break
+                    else:
+                        error_msg = 'No comment found associated with the ' \
+                                    f'field data {bold(match.group().strip())}'
+                        self._log_error(error_msg)
+                        return result.set_error(error_msg)
+                        # TODO: raise (gives you a traceback) or self._log_error()? and other places
+                        # raise ValueError(error_msg)
+                else:
+                    pos -= 1
+                    continue
+            for groupNum in range(0, len(match.groups())):
+                groupNum = groupNum + 1
+                group = match.group(groupNum)
+                if not group:
+                    continue
+                if groupNum == 2:
+                    print(yellow(comment_line))
+                    field_name = group.replace("'", '').replace(':', '').replace('=', '').strip()
+                    field_value = self._input(field_name,
+                                              auto_check=True, skip=True)
+                    if field_value:
+                        # TODO: assume only strings as values
+                        field_value = f"'{field_value}'"
+                        if match.group().split(field_name)[1].strip().startswith('='):
+                            sep = ' ='
+                        else:
+                            sep = ':'
+                            field_name = f"'{field_name}'"
+                            field_value += ','
+                        regex = regex_template.replace('FIELD_NAME', field_name).replace('FIELD_VALUE', '.+')
+                        new_field = f"{field_name}{sep} {field_value}"
+                        user_content = re.sub(regex, new_field, user_content)
+                    else:
+                        logger.info(violet('Skipped field!'))
+                    print()
+        ipdb.set_trace()
+        write(user_cfg_fp, user_content)
+        return result.set_success()
+
     def _input(self, opt_name, values=None, lower=False, is_path=False,
-               is_userid=False, is_address=False, is_server=False):
+               is_userid=False, is_address=False, is_server=False,
+               auto_check=True, skip=False):
         def invalid(msg):
             return red(msg)
 
+        if auto_check:
+            if 'path' in opt_name or 'homedir' in opt_name:
+                is_path = True
+            elif opt_name in ['signature']:
+                is_userid = True
+            elif 'address' in opt_name:
+                is_address = True
+            elif 'server' in opt_name:
+                is_server = True
         while True:
             ans = input(f'{opt_name}: ')
             ans = ans.lower() if lower else ans
             ans = ans.strip()
-            if values:
+            if skip and not ans:
+                return ans
+            elif values:
                 if ans in values:
                     return ans
                 else:
@@ -1007,14 +1096,6 @@ class CryptEmail:
             return result.set_error(error_msg)
 
 
-def initialize():
-    logger.info('Initialize the config file ...')
-    default_cfg_fp = get_main_config_filepath(default_config=True)
-    user_cfg_fp = get_main_config_filepath(configs_dirpath=cryptlib.__project_dir__)
-    import ipdb
-    ipdb.set_trace()
-
-
 def main():
     try:
         exit_code = 0
@@ -1048,8 +1129,6 @@ def main():
                 exit_code = edit_file(app=main_config.app,
                                       configs_dirpath=cryptlib.__project_dir__,
                                       verbose=main_config.verbose)
-        elif main_config.subcommand == 'init':
-            initialize()
         elif main_config.subcommand == 'uninstall':
             logger.info('Uninstalling the program '
                         f'{bold(cryptlib.__project_name__)} ...')

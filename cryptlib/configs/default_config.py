@@ -26,6 +26,7 @@ app = None
 # ==================
 # Connection options
 # ==================
+# Your mailbox address, e.g. your_email@address.com
 mailbox_address = 'WRITEME: your_mailbox@address.com'
 # How to connect to the email server: googleapi or smtp_imap
 connection_method = 'smtp_imap'
@@ -34,6 +35,7 @@ connection_method = 'smtp_imap'
 # IMPORTANT: token-based authentication is only supported for gmail addresses
 # The use of tokens is more secure than using an email password
 googleapi = {
+    # Path to the credential
     'credentials_path': 'WRITEME: /path/to/credentials.json',
     # Scopes for the gmail google API
     'scopes_for_sending': ['https://www.googleapis.com/auth/gmail.modify'],
@@ -56,6 +58,7 @@ smtp_imap = {
 # ==================================
 # Config options for sending emails
 send_emails = {
+    # Email address of the receiver (aka recipient)
     'receiver_email_address': 'WRITEME: receiver@mail.com',
     # Sign and encrypt in a single pass. Otherwise, sign first and then encrypt
     # as separate steps
@@ -64,13 +67,13 @@ send_emails = {
     'sign': {
         'program': 'GPG',
         'enable_signature': False,
-        # Your signature (USER-ID), e.g. fingerprint
+        # Your signature (USER-ID) for signing the email, e.g. fingerprint
         'signature': 'WRITEME: YOUR_SIGNATURE'
     },
     # Encryption options
     'encrypt': {
         'program': 'GPG',
-        # Recipient's USER-ID, e.g. fingerprint
+        # Recipient's USER-ID for encrypting the email, e.g. fingerprint
         'recipient_userid': 'WRITEME: RECIPIENT_USERID'
     }
 }
@@ -97,3 +100,5 @@ test_message = "Hello, World!"
 # Test connection to an email server either through googleapi, smtp_imap or None
 # If None, then no connection testing will done
 test_connection = None
+
+# 'emails_dirpath': 'WRITEME: /path/to/emails'
