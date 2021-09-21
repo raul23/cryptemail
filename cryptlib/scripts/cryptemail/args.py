@@ -65,7 +65,7 @@ def add_general_options(parser, add_opts=None, remove_opts=None,
     if checker.check('version') and False:
         parser_general_group.add_argument(
             '-v', '--version', action='version',
-            version=f'{prog_name(__file__)} {program_version}',
+            version=f'{bold(cryptlib.__project_name__)} {program_version}',
             help="Show program's version number and exit.")
     if checker.check('quiet'):
         parser_general_group.add_argument(
@@ -174,7 +174,7 @@ def setup_argparser():
                                help='Show this help message and exit.')
     general_group.add_argument(
         '-v', '--version', action='version',
-        version=f'{prog_name(__file__)} v{cryptlib.__version__}',
+        version=f'{bold(cryptlib.__project_name__)} v{cryptlib.__version__}',
         help="Show program's version number and exit.")
     # ===========
     # Subcommands
@@ -222,30 +222,25 @@ def setup_argparser():
     # ===========================
     # create the parser for the "edit" command
     subcommand = 'edit'
-    parser_test = subparsers.add_parser(
+    parser_edit = subparsers.add_parser(
         subcommand,
         prog=cryptlib.__project_name__,
         usage=subcommand_usage(cryptlib.__project_name__, subcommand),
-        description='Edit or reset the configuration file.',
+        description='Edit the configuration file.',
         add_help=False,
-        help='Edit/reset the configuration file.',
+        help='Edit the configuration file.',
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
-    add_general_options(parser_test, remove_opts=['homedir', 'interactive',
+    add_general_options(parser_edit, remove_opts=['homedir', 'interactive',
                                                   'prompt_passwords'])
-    parser_edit_group = parser_test.add_argument_group(
-        title=f"{yellow('Edit/reset options')}")
-    edit_mutual_group = parser_edit_group.add_mutually_exclusive_group()
-    edit_mutual_group.add_argument(
+    parser_edit_group = parser_edit.add_argument_group(
+        title=f"{yellow('Edit options')}")
+    parser_edit_group.add_argument(
         '-a', '--app', dest='app',
         help='Name of the application to use for editing the '
              f'{bold(cryptlib.__project_name__)} configuration file. If no name is '
              'given, then the default application for opening this type of '
              'file (.py) will be used.')
-    edit_mutual_group.add_argument(
-        '-r', '--reset', action='store_true',
-        help=f'Reset the {bold(cryptlib.__project_name__)} configuration file '
-             'to factory values.')
     # ============
     # Init options
     # ============
@@ -283,6 +278,23 @@ def setup_argparser():
     add_googleapi_options(parser_read)
     add_smtp_imap_options(parser_read)
     parser_read_group = parser_read.add_argument_group(title=f"{yellow('Read options')}")
+    # ============================
+    # Reset cryptemail config file
+    # ============================
+    # create the parser for the "edit" command
+    subcommand = 'reset'
+    parser_reset = subparsers.add_parser(
+        subcommand,
+        prog=cryptlib.__project_name__,
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
+        description=f'Reset the {bold(cryptlib.__project_name__)} configuration '
+                    'file to factory values.',
+        add_help=False,
+        help='Reset the configuration file.',
+        formatter_class=lambda prog: MyFormatter(
+            prog, max_help_position=50, width=width))
+    add_general_options(parser_reset, remove_opts=['homedir', 'interactive',
+                                                   'prompt_passwords'])
     # ===================
     # Send emails options
     # ===================
@@ -358,8 +370,8 @@ def setup_argparser():
     # create the parser for the "uninstall" command
     subcommand = 'uninstall'
     desc = "Uninstall the `package` (including the program " \
-           f"'{prog_name(__file__)}') or `everything` (including config and " \
-           "log files)."
+           f"'{bold(cryptlib.__project_name__)}') or `everything` (including " \
+           f"config and log files)."
     parser_test = subparsers.add_parser(
         subcommand,
         prog=cryptlib.__project_name__,

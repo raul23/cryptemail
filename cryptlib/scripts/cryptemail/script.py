@@ -1156,13 +1156,12 @@ def main():
                   formater_handler_names=['console'])
         process_returned_values(returned_values)
         if main_config.subcommand == 'edit':
-            if main_config.reset:
-                exit_code = reset_file(configs_dirpath=cryptlib.__project_dir__,
-                                       verbose=main_config.verbose)
-            else:
-                exit_code = edit_file(app=main_config.app,
-                                      configs_dirpath=cryptlib.__project_dir__,
-                                      verbose=main_config.verbose)
+            exit_code = edit_file(app=main_config.app,
+                                  configs_dirpath=cryptlib.__project_dir__,
+                                  verbose=main_config.verbose)
+        elif main_config.subcommand == 'reset':
+            exit_code = reset_file(configs_dirpath=cryptlib.__project_dir__,
+                                   verbose=main_config.verbose)
         elif main_config.subcommand == 'uninstall':
             logger.info('Uninstalling the program '
                         f'{bold(cryptlib.__project_name__)} ...')
