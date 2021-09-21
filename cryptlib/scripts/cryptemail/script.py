@@ -714,10 +714,34 @@ class CryptEmail:
             return 0
 
     def _read_emails(self):
-        logger.info(blue('### Reading emails ###'))
+        logger.info(blue('Read emails'))
+        # Connect to the email provider and read the encrypted emails
+        logger.info("Mailbox address: "
+                    f"{self.config.mailbox_address}")
+        if self.config.connection_method == 'googleapi':
+            return self._read_emails_with_tokens()
+        else:
+            return self._read_emails_with_password()
+
+    def _read_emails_with_password(self):
         result = Result()
-        result.set_success()
-        return result
+        # TODO: duplicate msgs in _send_email_with_password()
+        logger.debug("Connecting to the email server with 'imap'")
+        logger.debug('Logging to the imap server using a PASSWORD (less '
+                     'secure than with TOKENS)')
+        return result.set_success()
+
+    def _read_emails_with_tokens(self):
+        result = Result()
+        connection_type = self.config.connection_method
+        auth_config = getattr(self.config, connection_type)
+        service = self._connect_with_tokens(
+            email_account=self.config.mailbox_address,
+            connection_type=connection_type,
+            credentials_path=auth_config['credentials_path'],
+            scopes=auth_config['scopes_for_reading'])
+        # Call the Gmail API
+        return result.set_success()
 
     def _run_tests(self):
         logger.info('Running tests from config file ...\n')
@@ -773,7 +797,7 @@ class CryptEmail:
         else:
             logger.warning(yellow('No encryption will be applied on the email ...'))
             time.sleep(2)
-        # Connect to the email provider server and send the encrypted email
+        # Connect to the email provider and send the encrypted email
         logger.info("sender email address: "
                     f"{self.config.mailbox_address}")
         logger.info("receiver email address: "
