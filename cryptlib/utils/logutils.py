@@ -8,6 +8,7 @@ from logging import NullHandler, StreamHandler
 from cryptlib.utils import genutils
 from genutils import COLORS, red
 
+
 class Logger:
     def __init__(self, name, file_):
         self.logger = init_log(name, file_)

@@ -1009,6 +1009,10 @@ class CryptEmail:
 
 def initialize():
     logger.info('Initialize the config file ...')
+    default_cfg_fp = get_main_config_filepath(default_config=True)
+    user_cfg_fp = get_main_config_filepath(configs_dirpath=cryptlib.__project_dir__)
+    import ipdb
+    ipdb.set_trace()
 
 
 def main():
@@ -1020,33 +1024,37 @@ def main():
         # Parse command-line arguments
         parser = setup_argparser()
         args = parser.parse_args()
-        main_cfg = argparse.Namespace(**get_config_dict('main', cryptlib.__project_dir__))
+        main_config = argparse.Namespace(**get_config_dict('main', cryptlib.__project_dir__))
         # Override configuration dict with command-line arguments
-        returned_values = override_config_with_args(main_cfg, get_config_dict('main'), args)
+        returned_values = override_config_with_args(
+            main_config=main_config,
+            default_main_config=get_config_dict('main', default_config=True),
+            args=args)
         setup_log(package=cryptlib.__package_name__,
                   script_name=cryptlib.__project_name__,
                   log_filepath=LOGGING_PATH,
-                  quiet=main_cfg.quiet,
-                  verbose=main_cfg.verbose,
-                  logging_level=main_cfg.logging_level,
-                  logging_formatter=main_cfg.logging_formatter,
+                  quiet=main_config.quiet,
+                  verbose=main_config.verbose,
+                  logging_level=main_config.logging_level,
+                  logging_formatter=main_config.logging_formatter,
                   level_handler_names=['console', 'file'],
                   formater_handler_names=['console'])
         process_returned_values(returned_values)
-        if main_cfg.subcommand == 'edit':
-            if main_cfg.reset:
-                exit_code = reset_file(configs_dirpath=cryptlib.__project_dir__)
+        if main_config.subcommand == 'edit':
+            if main_config.reset:
+                exit_code = reset_file(configs_dirpath=cryptlib.__project_dir__,
+                                       verbose=main_config.verbose)
             else:
-                exit_code = edit_file(app=main_cfg.app,
+                exit_code = edit_file(app=main_config.app,
                                       configs_dirpath=cryptlib.__project_dir__,
-                                      verbose=main_cfg.verbose)
-        elif main_cfg.subcommand == 'init':
+                                      verbose=main_config.verbose)
+        elif main_config.subcommand == 'init':
             initialize()
-        elif main_cfg.subcommand == 'uninstall':
+        elif main_config.subcommand == 'uninstall':
             logger.info('Uninstalling the program '
                         f'{bold(cryptlib.__project_name__)} ...')
         else:
-            exit_code = CryptEmail(main_cfg).run()
+            exit_code = CryptEmail(main_config).run()
     except KeyboardInterrupt:
         logger.debug('Ctrl+c detected!')
         exit_code = 2

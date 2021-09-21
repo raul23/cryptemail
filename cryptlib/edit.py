@@ -98,16 +98,20 @@ def edit_file(cfg_type='main', app=None, configs_dirpath=None, verbose=False):
     return retcode
 
 
-def reset_file(cfg_type='main', configs_dirpath=None):
+def reset_file(cfg_type='main', configs_dirpath=None, verbose=False):
     # Get path to the config file
     filepath = get_config_filepath(cfg_type, configs_dirpath)
     logger.info(f'Resetting {bold(os.path.basename(filepath))} ...')
     logger.debug(f'Filepath: {filepath}')
     # Copy it from the default one
     if cfg_type == 'main':
-        src = get_main_config_filepath(configs_dirpath, default_config=True)
+        src = get_main_config_filepath(default_config=True)
     else:
-        src = get_logging_filepath(configs_dirpath, default_config=True)
-    shutil.copy(src, filepath)
+        src = get_logging_filepath(default_config=True)
+    try:
+        shutil.copy(src, filepath)
+    except FileNotFoundError as e:
+        log_error(logger, e, verbose)
+        return 1
     logger.info(green('File was reset!'))
     return 0

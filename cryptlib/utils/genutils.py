@@ -99,15 +99,15 @@ class MyFormatter(argparse.RawDescriptionHelpFormatter):
             return ', '.join(parts)
 
 
-def get_config_dict(cfg_type='main', configs_dirpath=None):
-    return load_cfg_dict(get_config_filepath(cfg_type, configs_dirpath), cfg_type)
+def get_config_dict(cfg_type='main', configs_dirpath=None, default_config=False):
+    return load_cfg_dict(get_config_filepath(cfg_type, configs_dirpath, default_config), cfg_type)
 
 
-def get_config_filepath(cfg_type='main', configs_dirpath=None):
+def get_config_filepath(cfg_type='main', configs_dirpath=None, default_config=False):
     if cfg_type == 'main':
-        cfg_filepath = get_main_config_filepath(configs_dirpath)
+        cfg_filepath = get_main_config_filepath(configs_dirpath, default_config)
     elif cfg_type == 'log':
-        cfg_filepath = get_logging_filepath(configs_dirpath)
+        cfg_filepath = get_logging_filepath(configs_dirpath, default_config)
     else:
         raise ValueError(f"Invalid cfg_type: {cfg_type}")
     return cfg_filepath
@@ -145,7 +145,6 @@ def load_cfg_dict(cfg_filepath, cfg_type):
                             f"{cfg_filepath}")
         return cfg_dict
 
-    configs_dirpath = Path(cfg_filepath).parent
     assert cfg_type in CFG_TYPES, f"Invalid cfg_type: {cfg_type}"
     _, file_ext = os.path.splitext(cfg_filepath)
     try:
@@ -153,9 +152,9 @@ def load_cfg_dict(cfg_filepath, cfg_type):
     except FileNotFoundError:
         # Copy it from the default one
         if cfg_type == 'main':
-            src = get_main_config_filepath(configs_dirpath, default_config=True)
+            src = get_main_config_filepath(default_config=True)
         else:
-            src = get_logging_filepath(configs_dirpath, default_config=True)
+            src = get_logging_filepath(default_config=True)
         shutil.copy(src, cfg_filepath)
         # print(f"Config file created: {cfg_filepath}")
         cfg_dict = _load_cfg_dict(cfg_filepath, cfg_type)
@@ -448,9 +447,6 @@ def get_configs_dirpath():
 
 def get_logging_filepath(configs_dirpath=None, default_config=False):
     configs_dirpath = get_configs_dirpath() if configs_dirpath is None else configs_dirpath
-    if default_config and not os.path.exists(os.path.join(configs_dirpath, CFG_TYPES['log']['default'])):
-        default_config = True
-        configs_dirpath = get_configs_dirpath()
     if default_config:
         return os.path.join(configs_dirpath, CFG_TYPES['log']['default'])
     else:
@@ -459,9 +455,6 @@ def get_logging_filepath(configs_dirpath=None, default_config=False):
 
 def get_main_config_filepath(configs_dirpath=None, default_config=False):
     configs_dirpath = get_configs_dirpath() if configs_dirpath is None else configs_dirpath
-    if default_config and not os.path.exists(os.path.join(configs_dirpath, CFG_TYPES['main']['default'])):
-        default_config = True
-        configs_dirpath = get_configs_dirpath()
     if default_config:
         return os.path.join(configs_dirpath, CFG_TYPES['main']['default'])
     else:
