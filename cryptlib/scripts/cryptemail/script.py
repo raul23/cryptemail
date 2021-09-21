@@ -444,7 +444,7 @@ class CryptEmail:
             while True:
                 if pos == -1:
                     error_msg = 'pos=-1: No comment found associated with ' \
-                                f'he field data {bold(match.group().strip())}'
+                                f'the field data {bold(match.group().strip())}'
                     self._log_error(error_msg)
                     return result.set_error(error_msg)
                 char = default_content[pos]
@@ -462,7 +462,6 @@ class CryptEmail:
                         # raise ValueError(error_msg)
                 else:
                     pos -= 1
-                    continue
             for groupNum in range(0, len(match.groups())):
                 groupNum = groupNum + 1
                 group = match.group(groupNum)
