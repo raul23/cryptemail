@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import platform
 import readline
 import smtplib
 import ssl
@@ -44,6 +43,7 @@ class InvalidDataError(Exception):
 class CryptEmail:
     def __init__(self, config):
         self.config = config
+        # TODO: move _check_args and _check_config in run()?
         self._check_args()
         self._check_config(self.config.__dict__)
         self._check_gnupghome(self.config.homedir)
@@ -368,17 +368,20 @@ class CryptEmail:
                 encrypted_msg = ''
                 status = 'invalid recipient'
                 stderr = f"The recipient '{recipient}' was not found in the " \
-                         "keyring"
+                         "GPG's keys"
             if status == 'encryption ok':
                 logger.info('Message encrypted')
                 update_gpg_pass(credential, success=True)
             else:
                 # case: invalid password entered twice
                 update_gpg_pass(credential, success=False)
+                """
                 error_msg = f"Status from encrypt(): {status}\n" \
                             f"{stderr}"
+                """
+                logger.warning(yellow(f'Status from encrypt(): {status}'))
                 # TODO: important, another exception type?
-                raise ValueError(error_msg)
+                raise ValueError(stderr)
             # gpg.list_keys()
             # gpg.delete_keys()
         else:
@@ -390,7 +393,7 @@ class CryptEmail:
         logger.debug(f"Checking fingerprint {bold(fingerprint)} ...")
         if fingerprint not in gpg.list_keys().fingerprints:
             logger.debug(f"The fingerprint {bold(fingerprint)} was not found in "
-                         "the keyring")
+                         "the GPG's keys")
             return 0
         return 1
 
@@ -468,7 +471,6 @@ class CryptEmail:
         regex = '([# ]*)' + regex_template
         regex = regex.replace('FIELD_NAME', "[A-Za-z0-9_']+").replace('FIELD_VALUE', "'WRITEME:[\s]*[A-Za-z0-9_@.\/']+")
         matches = re.finditer(regex, default_content, re.MULTILINE)
-        # ipdb.set_trace()
         print(blue("\nEnter the following data. To skip a field, just press "
                    f"{bold('<Enter>')}\n"))
         for matchNum, match in enumerate(matches, start=1):
@@ -562,6 +564,7 @@ class CryptEmail:
                     print(invalid("Path doesn't exist!"))
             elif is_userid:
                 if os.path.exists(self.config.homedir):
+                    # TODO: check even recipients' userids? (other places)
                     gpg = gnupg.GPG(gnupghome=self.config.homedir)
                     if self._fingerprint_exists(ans, gpg):
                         return ans

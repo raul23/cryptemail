@@ -147,9 +147,14 @@ def init_log(module__name__, module___file__=None, package_name=None):
 def log_error(logger, error, verbose, nl=False):
     if verbose:
         error_msg = traceback.format_exc().strip()
+        error_lines = '\n'.join(error.splitlines()[1:])
+        if error_lines and error_lines in error_msg:
+            found_duplicate = True
+        else:
+            found_duplicate = False
         if error_msg == 'NoneType: None':
             error_msg = error
-        elif error.__str__() not in error_msg:
+        elif error.__str__() not in error_msg and not found_duplicate:
             error_msg += f'\n{error}'
     else:
         error_msg = red(error.__str__())
