@@ -6,7 +6,6 @@ from logging import NullHandler, StreamHandler
 
 # TODO: check why ImportError: cannot import name 'COLORS' from 'cryptlib.utils.genutils'
 from cryptlib.utils import genutils
-from genutils import COLORS, red
 
 
 class Logger:
@@ -59,7 +58,7 @@ class Logger:
 
     @staticmethod
     def _remove_colors(msg):
-        for c in COLORS.values():
+        for c in genutils.COLORS.values():
             msg = msg.replace(c, "")
         return msg
 
@@ -157,10 +156,10 @@ def log_error(logger, error, verbose, nl=False):
         elif error.__str__() not in error_msg and not found_duplicate:
             error_msg += f'\n{error}'
     else:
-        error_msg = red(error.__str__())
+        error_msg = genutils.red(error.__str__())
     if nl:
         error_msg += '\n'
-    logger.error(red(error_msg))
+    logger.error(genutils.red(error_msg))
 
 
 # TODO: specify log_dict change inline

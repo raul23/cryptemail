@@ -309,15 +309,15 @@ class CryptEmail:
                     self.config.gpg_account = True
                 else:
                     self.config.gpg_passphrase = True
-        account = violet(self.config.username)
+        account = blue(self.config.username)
         if email_arg:
             if self.config.subcommand == 'delete':
-                logger.info(f'Delete the email account {account}')
+                logger.info(f'Deleting the email account {account} ...')
             else:
                 logger.info(f'Update the email password for the username {account}')
         else:
             if self.config.subcommand == 'delete':
-                logger.info(f'Delete the GPG account {account}')
+                logger.info(f'Deleting the GPG account {account} ...')
             else:
                 logger.info(f'Update the GPG passphrase for the account {account}')
         if ans:
