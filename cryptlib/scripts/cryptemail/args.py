@@ -115,7 +115,7 @@ def add_googleapi_options(parser, title='googleapi options'):
         dest='googleapi.credentials_path',
         help="Path to the credentials file (JSON).")
     googleapi_group.add_argument(
-        '--ss', '--scopes-sending', metavar='PATH', nargs='*',
+        '--ss', '--scopes-sending', metavar='SCOPE', nargs='*',
         dest='googleapi.scopes_for_sending',
         help="Scopes applied when sending emails from gmail.com "
              + default(default_config.googleapi['scopes_for_sending']))
