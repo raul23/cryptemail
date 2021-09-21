@@ -35,7 +35,7 @@ connection_method = 'smtp_imap'
 # IMPORTANT: token-based authentication is only supported for gmail addresses
 # The use of tokens is more secure than using an email password
 googleapi = {
-    # Path to the credential
+    # Path to the gmail's credentials file (e.g. credentials.json)
     'credentials_path': 'WRITEME: /path/to/credentials.json',
     # Scopes for the gmail google API
     'scopes_for_sending': ['https://www.googleapis.com/auth/gmail.modify'],
@@ -100,5 +100,3 @@ test_message = "Hello, World!"
 # Test connection to an email server either through googleapi, smtp_imap or None
 # If None, then no connection testing will done
 test_connection = None
-
-# 'emails_dirpath': 'WRITEME: /path/to/emails'
