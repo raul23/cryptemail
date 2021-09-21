@@ -189,34 +189,6 @@ def setup_argparser():
         # TODO: important, test without subcommand
         subparsers = parser.add_subparsers(
             title=title, description=None, dest='subcommand', help=None)
-    # ==============
-    # Delete options
-    # ==============
-    # create the parser for the "delete" command
-    subcommand = 'delete'
-    parser_delete = subparsers.add_parser(
-        subcommand,
-        prog=cryptlib.__project_name__,
-        usage=subcommand_usage(cryptlib.__project_name__, subcommand,
-                               required_args='-u USERNAME'),
-        description='Delete an account in the keyring (i.e. email or GPG account).',
-        add_help=False,
-        help='Delete an account in the keyring.',
-        formatter_class=lambda prog: MyFormatter(
-            prog, max_help_position=50, width=width))
-    add_general_options(parser_delete,
-                        remove_opts=['homedir', 'interactive', 'prompt_passwords', 'quiet'])
-    parser_delete_group = parser_delete.add_argument_group(
-        title=f"{yellow('Delete options')}")
-    delete_mutual_group = parser_delete_group.add_mutually_exclusive_group()
-    delete_mutual_group.add_argument('-e', '--email-account', dest='email_account',
-                                     action='store_true',
-                                     help='Delete an email account for a given username in the keyring.')
-    delete_mutual_group.add_argument('-g', '--gpg-account', dest='gpg_account',
-                                     action='store_true',
-                                     help='Delete a GPG account for a given username in the keyring.')
-    parser_delete_group.add_argument('-u', '--username', dest='username',
-                                     help='Username.')
     # ===========================
     # Edit cryptemail config file
     # ===========================
@@ -228,7 +200,7 @@ def setup_argparser():
         usage=subcommand_usage(cryptlib.__project_name__, subcommand),
         description='Edit the configuration file.',
         add_help=False,
-        help='Edit the configuration file.',
+        help=blue(f"Edit the {bold('configuration file')}."),
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_edit, remove_opts=['homedir', 'interactive',
@@ -250,34 +222,14 @@ def setup_argparser():
         subcommand,
         prog=cryptlib.__project_name__,
         usage=subcommand_usage(cryptlib.__project_name__, subcommand),
-        description='Initialize the config file.',
+        description='Initialize the configuration file.',
         add_help=False,
-        help='Initialize the config file.',
+        help=blue(f"Initialize the {bold('configuration file')}."),
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_init,
                         remove_opts=['homedir', 'interactive', 'prompt_passwords', 'quiet'])
     parser_init_group = parser_init.add_argument_group(title=f"{yellow('Init options')}")
-    # ===================
-    # Read emails options
-    # ===================
-    # create the parser for the "read" command
-    subcommand = 'read'
-    parser_read = subparsers.add_parser(
-        subcommand,
-        prog=cryptlib.__project_name__,
-        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
-        description='Read emails from your inbox which might contain '
-                    'unencrypted and encrypted emails.',
-        add_help=False,
-        help='Read your emails.',
-        formatter_class=lambda prog: MyFormatter(
-            prog, max_help_position=50, width=width))
-    add_general_options(parser_read)
-    add_connection_options(parser_read)
-    add_googleapi_options(parser_read)
-    add_smtp_imap_options(parser_read)
-    parser_read_group = parser_read.add_argument_group(title=f"{yellow('Read options')}")
     # ============================
     # Reset cryptemail config file
     # ============================
@@ -290,11 +242,31 @@ def setup_argparser():
         description=f'Reset the {bold(cryptlib.__project_name__)} configuration '
                     'file to factory values.',
         add_help=False,
-        help='Reset the configuration file.',
+        help=blue(f"Reset the {bold('configuration file')}."),
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_reset, remove_opts=['homedir', 'interactive',
                                                    'prompt_passwords'])
+    # ===================
+    # Read emails options
+    # ===================
+    # create the parser for the "read" command
+    subcommand = 'read'
+    parser_read = subparsers.add_parser(
+        subcommand,
+        prog=cryptlib.__project_name__,
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
+        description='Read emails from your inbox which might contain '
+                    'unencrypted and encrypted emails.',
+        add_help=False,
+        help=violet('Read your emails.'),
+        formatter_class=lambda prog: MyFormatter(
+            prog, max_help_position=50, width=width))
+    add_general_options(parser_read)
+    add_connection_options(parser_read)
+    add_googleapi_options(parser_read)
+    add_smtp_imap_options(parser_read)
+    parser_read_group = parser_read.add_argument_group(title=f"{yellow('Read options')}")
     # ===================
     # Send emails options
     # ===================
@@ -306,7 +278,7 @@ def setup_argparser():
         usage=subcommand_usage(cryptlib.__project_name__, subcommand),
         description='Send a signed and/or encrypted email.',
         add_help=False,
-        help='Send an encrypted email.',
+        help=violet('Send an encrypted email.'),
         formatter_class=lambda prog: MyFormatter(
             prog, max_help_position=50, width=width))
     add_general_options(parser_send)
@@ -324,6 +296,68 @@ def setup_argparser():
         '-r', '--receiver-email', metavar='ADDRESS',
         dest='send_emails.receiver_email_address',
         help="Receiver's email address (e.g. receiver@address.com)")
+    # ==============
+    # Delete options
+    # ==============
+    # create the parser for the "delete" command
+    subcommand = 'delete'
+    parser_delete = subparsers.add_parser(
+        subcommand,
+        prog=cryptlib.__project_name__,
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand,
+                               required_args='-u USERNAME'),
+        description='Delete an account in the keyring (i.e. email or GPG account).',
+        add_help=False,
+        help=green('Delete an account in the keyring.'),
+        formatter_class=lambda prog: MyFormatter(
+            prog, max_help_position=50, width=width))
+    add_general_options(parser_delete,
+                        remove_opts=['homedir', 'interactive', 'prompt_passwords', 'quiet'])
+    parser_delete_group = parser_delete.add_argument_group(
+        title=f"{yellow('Delete options')}")
+    delete_mutual_group = parser_delete_group.add_mutually_exclusive_group()
+    delete_mutual_group.add_argument('-e', '--email-account', dest='email_account',
+                                     action='store_true',
+                                     help='Delete an email account for a given username in the keyring.')
+    delete_mutual_group.add_argument('-g', '--gpg-account', dest='gpg_account',
+                                     action='store_true',
+                                     help='Delete a GPG account for a given username in the keyring.')
+    parser_delete_group.add_argument('-u', '--username', dest='username',
+                                     help='Username.')
+    # ==============
+    # Update options
+    # ==============
+    # create the parser for the "update" command
+    subcommand = 'update'
+    parser_update = subparsers.add_parser(
+        subcommand,
+        prog=cryptlib.__project_name__,
+        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
+        description='Update the googleapi tokens or the keyring (i.e. email password or GPG passphrase).',
+        add_help=False,
+        help=green('Update the keyring or googleapi tokens.'),
+        formatter_class=lambda prog: MyFormatter(
+            prog, max_help_position=50, width=width))
+    add_general_options(parser_update,
+                        remove_opts=['homedir', 'interactive', 'prompt_passwords', 'quiet'])
+    parser_update_key_group = parser_update.add_argument_group(
+        title=f"{yellow('Update keyring options')}")
+    update_mutual_group = parser_update_key_group.add_mutually_exclusive_group()
+    update_mutual_group.add_argument('-e', '--email-password', dest='email_password',
+                                     action='store_true',
+                                     help='Update an email password for a given username found in the keyring.')
+    update_mutual_group.add_argument('-g', '--gpg-passphrase', dest='gpg_passphrase',
+                                     action='store_true',
+                                     help='Update a GPG passphrase for a given username found in the keyring.')
+    parser_update_key_group.add_argument('-u', '--username', dest='username',
+                                         help='Username.')
+    parser_update_token_group = parser_update.add_argument_group(
+        title=f"{yellow('Update the googleapi tokens options')}")
+    parser_update_token_group.add_argument('-t', '--tokens', dest='tokens', action='store_true',
+                                           help='Update the googleapi tokens if they have been expired or revoked.')
+    parser_update_token_group.add_argument(
+        '-d', '--directory', metavar='PATH', dest='tokens_dirpath',
+        help="Directory path containing the tokens and credentials files (JSON).")
     # ===============
     # Testing options
     # ===============
@@ -387,39 +421,5 @@ def setup_argparser():
     parser_uninstall_group.add_argument(
         '--uninstall', choices=['package', 'everything'],
         help=desc)
-    # ==============
-    # Update options
-    # ==============
-    # create the parser for the "update" command
-    subcommand = 'update'
-    parser_update = subparsers.add_parser(
-        subcommand,
-        prog=cryptlib.__project_name__,
-        usage=subcommand_usage(cryptlib.__project_name__, subcommand),
-        description='Update the googleapi tokens or the keyring (i.e. email password or GPG passphrase).',
-        add_help=False,
-        help='Update the keyring or googleapi tokens.',
-        formatter_class=lambda prog: MyFormatter(
-            prog, max_help_position=50, width=width))
-    add_general_options(parser_update,
-                        remove_opts=['homedir', 'interactive', 'prompt_passwords', 'quiet'])
-    parser_update_key_group = parser_update.add_argument_group(
-        title=f"{yellow('Update keyring options')}")
-    update_mutual_group = parser_update_key_group.add_mutually_exclusive_group()
-    update_mutual_group.add_argument('-e', '--email-password', dest='email_password',
-                                     action='store_true',
-                                     help='Update an email password for a given username found in the keyring.')
-    update_mutual_group.add_argument('-g', '--gpg-passphrase', dest='gpg_passphrase',
-                                     action='store_true',
-                                     help='Update a GPG passphrase for a given username found in the keyring.')
-    parser_update_key_group.add_argument('-u', '--username', dest='username',
-                                         help='Username.')
-    parser_update_token_group = parser_update.add_argument_group(
-        title=f"{yellow('Update the googleapi tokens options')}")
-    parser_update_token_group.add_argument('-t', '--tokens', dest='tokens', action='store_true',
-                                           help='Update the googleapi tokens if they have been expired or revoked.')
-    parser_update_token_group.add_argument(
-        '-d', '--directory', metavar='PATH', dest='tokens_dirpath',
-        help="Directory path containing the tokens and credentials files (JSON).")
     return parser
 
