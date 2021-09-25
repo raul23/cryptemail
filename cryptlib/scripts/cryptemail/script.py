@@ -733,6 +733,7 @@ class CryptEmail:
 
     def _read_emails_with_tokens(self):
         result = Result()
+        gpg = gnupg.GPG(gnupghome=self.config.homedir)
         connection_type = self.config.connection_method
         auth_config = getattr(self.config, connection_type)
         service = self._connect_with_tokens(
@@ -741,6 +742,44 @@ class CryptEmail:
             credentials_path=auth_config['credentials_path'],
             scopes=auth_config['scopes_for_reading'])
         # Call the Gmail API
+        result = service.users().messages().list(userId='me', labelIds = ['INBOX']).execute()
+        messages = result.get('messages')
+        list_messages = []
+        import ipdb
+        ipdb.set_trace()
+        for msg in messages:
+            message = {'id': msg['id']}
+            # Get the message from its id
+            message_dict = service.users().messages().get(userId='me', id=msg['id']).execute()
+            headers = {'Bcc': '', 'Date': '', 'Subject': '', 'From': ''}
+            for header in message_dict['payload']['headers']:
+                if header['name'] in headers.keys():
+                    headers[header['name']] = header['value']
+            ipdb.set_trace()
+            message['headers'] = headers
+            data = message_dict['payload']['body']['data']
+            decoded_text = base64.b64decode(data).decode()
+            message['body'] = decoded_text
+            if not (decoded_text.count('BEGIN PGP SIGNED MESSAGE') or
+                    decoded_text.count('BEGIN PGP MESSAGE')):
+                logger.debug("The message was not encrypted or signed with PGP")
+            else:
+                if decoded_text.count('PGP SIGNED MESSAGE') == 1 and \
+                        not decoded_text.count('BEGIN PGP MESSAGE'):
+                    logger.debug('The message is only signed with PGP but not '
+                                 'encrypted')
+                elif not decoded_text.count('PGP SIGNED MESSAGE') and \
+                        decoded_text.count('BEGIN PGP MESSAGE') == 1:
+                    logger.debug('The message is only encrypted with PGP but not '
+                                 'signed')
+                elif decoded_text.count('PGP SIGNED MESSAGE') == 1 and \
+                        decoded_text.count('BEGIN PGP MESSAGE') == 1:
+                    logger.debug('The message is encrypted and signed with PGP but '
+                                 'not encrypted')
+                else:
+                    logger.warning('The message content is not supported for '
+                                   'decryption with PGP')
+            list_messages.append(message)
         return result.set_success()
 
     def _run_tests(self):
