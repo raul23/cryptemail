@@ -158,12 +158,22 @@ class ArgumentParser(argparse.ArgumentParser):
 
 
 def setup_argparser():
+    logo = """
+      ::::::::  :::::::::  :::   ::: ::::::::: ::::::::::: ::::::::::   :::   :::       :::     ::::::::::: :::  
+    :+:    :+: :+:    :+: :+:   :+: :+:    :+:    :+:     :+:         :+:+: :+:+:    :+: :+:       :+:     :+:   
+   +:+        +:+    +:+  +:+ +:+  +:+    +:+    +:+     +:+        +:+ +:+:+ +:+  +:+   +:+      +:+     +:+    
+  +#+        +#++:++#:    +#++:   +#++:++#+     +#+     +#++:++#   +#+  +:+  +#+ +#++:++#++:     +#+     +#+     
+ +#+        +#+    +#+    +#+    +#+           +#+     +#+        +#+       +#+ +#+     +#+     +#+     +#+      
+#+#    #+# #+#    #+#    #+#    #+#           #+#     #+#        #+#       #+# #+#     #+#     #+#     #+#       
+########  ###    ###    ###    ###           ###     ########## ###       ### ###     ### ########### ##########   
+     
+"""
     # Setup the parser
     width = os.get_terminal_size().columns - 5
     # parser = argparse.ArgumentParser(
     parser = ArgumentParser(
         usage=main_usage(cryptlib.__project_name__),
-        description="Command-line program for sending and reading "
+        description=f"{logo}Command-line program for sending and reading "
                     "encrypted emails.",
         add_help=False,
         prog=cryptlib.__project_name__,
