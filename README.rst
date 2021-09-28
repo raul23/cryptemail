@@ -1,7 +1,3 @@
-==========
-cryptemail
-==========
-
 .. code-block:: txt
 
                                          888                                    d8b 888 
