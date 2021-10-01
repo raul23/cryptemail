@@ -27,7 +27,8 @@ def add_connection_options(parser, add_opts=None, remove_opts=None,
             '-c', '--connection', metavar='METHOD',
             dest='connection_method', choices=CONNECTIONS.values(),
             help='Connecting to an email server either with tokens '
-                 '(`googleapi`) or an email password (`smtp`).')
+                 '(`googleapi`) or an email password (`smtp`). ' +
+                 default(default_config.connection_method))
 
 
 def add_encryption_options(parser, add_opts=None, remove_opts=None,
