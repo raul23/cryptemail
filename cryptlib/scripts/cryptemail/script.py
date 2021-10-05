@@ -742,7 +742,7 @@ class CryptEmail:
             credentials_path=auth_config['credentials_path'],
             scopes=auth_config['scopes_for_reading'])
         # Call the Gmail API
-        result = service.users().messages().list(userId='me', labelIds = ['INBOX']).execute()
+        result = service.users().messages().list(userId='me', labelIds=['INBOX']).execute()
         messages = result.get('messages')
         list_messages = []
         import ipdb
